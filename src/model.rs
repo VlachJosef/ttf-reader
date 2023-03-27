@@ -38,6 +38,8 @@ impl GlyphId {
 pub enum Glyph {
     Empty {
         glyph_id: GlyphId,
+        advance_width: u16,
+        left_side_bearing: i16,
     },
     Simple {
         glyph_id: GlyphId,
@@ -45,10 +47,14 @@ pub enum Glyph {
         y_min: FWord, // Minimum y for coordinate data
         x_max: FWord, // Maximum x for coordinate data
         y_max: FWord, // Maximum y for coordinate data
+        advance_width: u16,
+        left_side_bearing: i16,
         contours: Vec<Contour>,
     },
     Compount {
         glyph_id: GlyphId,
+        advance_width: u16,
+        left_side_bearing: i16,
         components: Vec<ComponentData>,
     },
 }
@@ -60,7 +66,6 @@ pub enum PointType {
 }
 
 impl PointType {
-    //fn from(flags: ControlPointsFlags) -> PointType {
     pub fn from(on_curve: bool) -> PointType {
         if on_curve {
             PointType::OnCurve

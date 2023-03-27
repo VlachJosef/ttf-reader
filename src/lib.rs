@@ -560,6 +560,8 @@ mod tests {
                 x_max,
                 y_min,
                 y_max,
+                advance_width,
+                left_side_bearing,
                 contours,
             } => {
                 assert_eq!(glyph_id.id(), 4);
@@ -567,6 +569,8 @@ mod tests {
                 assert_eq!(x_max.0, 172);
                 assert_eq!(y_min.0, 0);
                 assert_eq!(y_max.0, 732);
+                assert_eq!(advance_width, 190);
+                assert_eq!(left_side_bearing, 84);
 
                 #[rustfmt::skip]
                 let expected_contours = vec![
@@ -641,6 +645,8 @@ mod tests {
                 x_max,
                 y_min,
                 y_max,
+                advance_width,
+                left_side_bearing,
                 contours,
             } => {
                 assert_eq!(glyph_id.id(), 0);
@@ -648,6 +654,8 @@ mod tests {
                 assert_eq!(x_max.0, 877);
                 assert_eq!(y_min.0, 0);
                 assert_eq!(y_max.0, 1552);
+                assert_eq!(advance_width, 1229);
+                assert_eq!(left_side_bearing, 147);
 
                 #[rustfmt::skip]
                 let expected_contours = vec![
@@ -684,6 +692,8 @@ mod tests {
                 x_max,
                 y_min,
                 y_max,
+                advance_width,
+                left_side_bearing,
                 contours,
             } => {
                 assert_eq!(glyph_id.id(), 4);
@@ -691,6 +701,8 @@ mod tests {
                 assert_eq!(x_max.0, 172);
                 assert_eq!(y_min.0, 0);
                 assert_eq!(y_max.0, 732);
+                assert_eq!(advance_width, 190);
+                assert_eq!(left_side_bearing, 84);
 
                 #[rustfmt::skip]
                 let expected_contours = vec![
@@ -764,6 +776,8 @@ mod tests {
                 x_max,
                 y_min,
                 y_max,
+                advance_width,
+                left_side_bearing,
                 contours,
             } => {
                 assert_eq!(glyph_id.id(), 4);
@@ -771,6 +785,8 @@ mod tests {
                 assert_eq!(x_max.0, 758);
                 assert_eq!(y_min.0, -47);
                 assert_eq!(y_max.0, 1552);
+                assert_eq!(advance_width, 1229);
+                assert_eq!(left_side_bearing, 471);
 
                 #[rustfmt::skip]
                 let expected_contours = vec![
@@ -815,6 +831,8 @@ mod tests {
                 x_max,
                 y_min,
                 y_max,
+                advance_width,
+                left_side_bearing,
                 contours,
             } => {
                 assert_eq!(glyph_id.id(), 68);
@@ -822,6 +840,8 @@ mod tests {
                 assert_eq!(x_max.0, 1118);
                 assert_eq!(y_min.0, -31);
                 assert_eq!(y_max.0, 1133);
+                assert_eq!(advance_width, 1229);
+                assert_eq!(left_side_bearing, 102);
 
                 #[rustfmt::skip]
                 let expected_contours = vec![
@@ -875,10 +895,14 @@ mod tests {
             Glyph::Empty { .. } => panic!("Expected Compount glyph"),
             Glyph::Compount {
                 glyph_id,
+                advance_width,
+                left_side_bearing,
                 components,
             } => {
                 assert_eq!(glyph_id.id(), 105);
                 assert_eq!(components.len(), 2);
+                assert_eq!(advance_width, 1229);
+                assert_eq!(left_side_bearing, 102);
 
                 let c1 = &components[0];
                 let c2 = &components[1];
@@ -914,6 +938,8 @@ mod tests {
                 x_max,
                 y_min,
                 y_max,
+                advance_width,
+                left_side_bearing,
                 contours,
             } => {
                 assert_eq!(glyph_id.id(), 1676);
@@ -921,6 +947,8 @@ mod tests {
                 assert_eq!(x_max.0, 1024);
                 assert_eq!(y_min.0, -202);
                 assert_eq!(y_max.0, 1555);
+                assert_eq!(advance_width, 1024);
+                assert_eq!(left_side_bearing, 1);
 
                 #[rustfmt::skip]
                 let expected_contours = vec![

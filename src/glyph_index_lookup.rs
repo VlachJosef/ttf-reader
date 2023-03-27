@@ -102,10 +102,6 @@ impl<'a> GlyphIndexLookup<'a> {
 
     fn compute_glyp_id(&mut self, start_code: u16, id_delta: u16, id_range_offset: u16) -> GlyphId {
         let glyph_id = if id_range_offset == 0 {
-            println!(
-                "char_code {} start_code {} id_delta {}",
-                self.char_code, start_code, id_delta
-            );
             // If the id_range_offset is 0, the id_delta value is added directly to the character code to get the corresponding glyph index
             id_delta as u32 + self.char_code as u32
         } else {

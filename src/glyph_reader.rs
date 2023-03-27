@@ -5,7 +5,7 @@ use crate::model::{ArgumentTypes, ComponentData, Glyph, GlyphId};
 use crate::table::cmap_table::CMapSubtable;
 use crate::table::head_table::HeadTable;
 use crate::table::hhea_table::HheaTable;
-use crate::table::htmx_table::HmtxTable;
+use crate::table::htmx_table::LongHorMetricLookup;
 use crate::table::loca_table::GlyphIdOffsetLookup;
 use crate::table::maxp_table::MaximumProfileTable;
 use crate::table::name_table;
@@ -18,6 +18,7 @@ pub struct GlyphReader {
     glyf_table_offset: u32,
     glyph_id_offset_lookup: GlyphIdOffsetLookup,
     cmap_subtable: CMapSubtable,
+    long_hor_metric_lookup: LongHorMetricLookup,
 }
 
 impl GlyphReader {
@@ -44,7 +45,7 @@ impl GlyphReader {
 
         let hhea_table = HheaTable::from_file(&mut file_ops, hhea_table.offset);
 
-        let htmx_table = HmtxTable::from_file(
+        let long_hor_metric_lookup = LongHorMetricLookup::from_file(
             &mut file_ops,
             htmx_table.offset,
             hhea_table,
@@ -68,6 +69,7 @@ impl GlyphReader {
             glyf_table_offset,
             glyph_id_offset_lookup,
             cmap_subtable,
+            long_hor_metric_lookup,
         }
     }
 
@@ -87,8 +89,6 @@ impl GlyphReader {
     pub fn read_glyph(&mut self, char_code: u16) -> Glyph {
         let glyph_id = self.char_code_to_glyph_id(char_code);
 
-        println!("c_c {} g_id {:?}", char_code, glyph_id);
-
         self.read(glyph_id)
     }
 
@@ -107,8 +107,24 @@ impl GlyphReader {
             .get(&glyph_id)
             .expect(&format!("{:?} not found in lookup map", glyph_id));
 
+        let long_hor_metric = self
+            .long_hor_metric_lookup
+            .0
+            .get(&glyph_id)
+            .expect(&format!(
+                "long_hor_metric for {:?} not found in lookup map",
+                glyph_id
+            ));
+
+        let advance_width = long_hor_metric.advance_width;
+        let left_side_bearing = long_hor_metric.left_side_bearing;
+
         if glyph_offset.is_empty() {
-            Glyph::Empty { glyph_id }
+            Glyph::Empty {
+                glyph_id,
+                advance_width,
+                left_side_bearing,
+            }
         } else {
             self.file_ops
                 .seek_from_start(self.glyf_table_offset + glyph_offset.offset());
@@ -130,6 +146,8 @@ impl GlyphReader {
                     x_max,
                     y_min,
                     y_max,
+                    advance_width,
+                    left_side_bearing,
                     contours,
                 }
             } else {
@@ -139,6 +157,8 @@ impl GlyphReader {
 
                 Glyph::Compount {
                     glyph_id,
+                    advance_width,
+                    left_side_bearing,
                     components,
                 }
             }
