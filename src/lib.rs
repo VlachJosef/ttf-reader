@@ -753,192 +753,64 @@ struct Segment {
     id_range_offset: u16,
 }
 
-impl CMapSubtable {
-    fn seek(mut file: &File, seek_from: SeekFrom) {
-        file.seek(seek_from).expect("Expected be able to seek");
+struct FileOps<'a> {
+    file: &'a File,
+}
+
+impl<'a> FileOps<'a> {
+    fn seek(&mut self, seek_from: SeekFrom) {
+        self.file.seek(seek_from).expect("Expected be able to seek");
     }
 
-    fn read_end_code(file: &File, current_search_range: i64) -> u16 {
-        Self::seek(file, SeekFrom::Current(current_search_range));
-        let end_code = read_u16(file);
+    fn read_end_code(&mut self, current_search_range: i64) -> u16 {
+        self.seek(SeekFrom::Current(current_search_range));
+        let end_code = read_u16(self.file);
 
         // Reset last read offset shift
-        Self::seek(file, SeekFrom::Current(-2));
+        self.seek(SeekFrom::Current(-2));
 
         end_code
     }
-    fn read_start_code(file: &File, seg_count_x2: i64) -> u16 {
-        Self::seek(file, SeekFrom::Current(2)); // Skip reservedPad
-        Self::seek(file, SeekFrom::Current(seg_count_x2));
+    fn read_start_code(&mut self, seg_count_x2: u16) -> u16 {
+        self.seek(SeekFrom::Current(2)); // Skip reservedPad
+        self.seek(SeekFrom::Current(seg_count_x2 as i64));
 
-        let start_code = read_u16(file);
+        let start_code = read_u16(self.file);
 
         // Reset last read offset shift
-        Self::seek(file, SeekFrom::Current(-2));
+        self.seek(SeekFrom::Current(-2));
 
         start_code
     }
 
-    fn read_id_delta(file: &File, seg_count_x2: i64) -> u16 {
-        Self::seek(file, SeekFrom::Current(seg_count_x2));
+    fn read_id_delta(&mut self, seg_count_x2: u16) -> u16 {
+        self.seek(SeekFrom::Current(seg_count_x2 as i64));
 
-        let id_delta = read_u16(file);
+        let id_delta = read_u16(self.file);
 
-        Self::seek(file, SeekFrom::Current(-2));
+        self.seek(SeekFrom::Current(-2));
 
         id_delta
     }
 
-    fn read_id_range_offset(file: &File, seg_count_x2: i64) -> u16 {
-        Self::seek(file, SeekFrom::Current(seg_count_x2));
+    fn read_id_range_offset(&mut self, seg_count_x2: u16) -> u16 {
+        self.seek(SeekFrom::Current(seg_count_x2 as i64));
 
-        let id_range_offset = read_u16(file);
+        let id_range_offset = read_u16(self.file);
 
-        Self::seek(file, SeekFrom::Current(-2));
+        self.seek(SeekFrom::Current(-2));
 
         id_range_offset
     }
 
-    fn read_address(mut file: &File) -> u64 {
-        file.stream_position()
+    fn read_address(&mut self) -> u64 {
+        self.file
+            .stream_position()
             .expect("Expected to read stream position")
     }
+}
 
-    fn compute_glyp_id(
-        file: &File,
-        char_code: u16,
-        start_code: u16,
-        id_delta: u16,
-        id_range_offset: u16,
-    ) -> GlyphId {
-        let glyph_id = if id_range_offset > 0 {
-            let address = Self::read_address(file);
-
-            println!("address {}", address);
-            println!("char_code {}", char_code);
-            println!("id_delta {}", id_delta);
-            println!("start_code {}", start_code);
-            println!("id_range_offset {}", id_range_offset);
-
-            let glyph_index_address =
-                id_range_offset as u32 + 2 * ((char_code - start_code) as u32) + address as u32;
-
-            Self::seek(file, SeekFrom::Start(glyph_index_address as u64));
-            read_u16(file) as u32
-        } else {
-            // If the id_range_offset is 0, the id_delta value is added directly to the character code to get the corresponding glyph index
-            id_delta as u32 + char_code as u32
-        };
-
-        // NOTE: All id_delta[i] arithmetic is modulo 65536.
-        let glyph_id = (glyph_id % (u16::MAX as u32 + 1)) as u16;
-
-        GlyphId(glyph_id)
-    }
-
-    fn binary_search(
-        file: &File,
-        char_code: u16,
-        end_code: u16,
-        current_search_range: i64,
-        seg_count_x2: i64,
-        entry_selector: u16,
-    ) -> GlyphId {
-        let start_code = Self::read_start_code(file, seg_count_x2);
-
-        println!(
-            "[CMapSubtable] seek_glyph_id level {} char_code {} seek {} start_code {} end_code {:?} ",
-            entry_selector,
-            char_code,
-            current_search_range,
-            start_code,
-            end_code
-        );
-
-        if char_code <= end_code && char_code > start_code {
-            let id_delta = Self::read_id_delta(file, seg_count_x2);
-            let id_range_offset = Self::read_id_range_offset(file, seg_count_x2);
-
-            Self::compute_glyp_id(file, char_code, start_code, id_delta, id_range_offset)
-        } else {
-            if entry_selector == 0 {
-                GlyphId::MISSING_CHARACTER_GLYPH
-            } else {
-                let current_search_range = current_search_range >> 1;
-
-                Self::seek(file, SeekFrom::Current(-2 - seg_count_x2)); // Go from start_code array (+reservedPad) back to end_code array
-
-                if char_code < end_code {
-                    let end_code = Self::read_end_code(file, -current_search_range);
-                    //println!("{} {} GOING LEFT ---->>> ", current_search_range, end_code);
-                    Self::binary_search(
-                        file,
-                        char_code,
-                        end_code,
-                        current_search_range,
-                        seg_count_x2,
-                        entry_selector - 1,
-                    )
-                } else {
-                    //println!("{} {} GOING RIGHT ---->>>", current_search_range, end_code);
-                    let end_code = Self::read_end_code(file, current_search_range);
-                    Self::binary_search(
-                        file,
-                        char_code,
-                        end_code,
-                        current_search_range,
-                        seg_count_x2,
-                        entry_selector - 1,
-                    )
-                }
-            }
-        }
-    }
-
-    fn sequential_search(file: &File, char_code: u16, seg_count_x2: i64) -> GlyphId {
-        Self::seek(file, SeekFrom::Current(2));
-
-        let next_end_code = read_u16(file);
-
-        if next_end_code >= char_code {
-            Self::seek(file, SeekFrom::Current(-2));
-            let start_code = Self::read_start_code(file, seg_count_x2);
-            let id_delta = Self::read_id_delta(file, seg_count_x2);
-            let id_range_offset = Self::read_id_range_offset(file, seg_count_x2);
-
-            Self::compute_glyp_id(file, char_code, start_code, id_delta, id_range_offset)
-        } else {
-            if next_end_code == 0xFFFF {
-                GlyphId::MISSING_CHARACTER_GLYPH
-            } else {
-                Self::sequential_search(file, char_code, seg_count_x2)
-            }
-        }
-    }
-
-    fn seek_glyph_id(
-        file: &File,
-        current_search_range: i64,
-        char_code: u16,
-        seg_count_x2: i64,
-        entry_selector: u16,
-    ) -> GlyphId {
-        let end_code = Self::read_end_code(file, current_search_range);
-
-        if char_code > end_code {
-            Self::sequential_search(file, char_code, seg_count_x2)
-        } else {
-            Self::binary_search(
-                file,
-                char_code,
-                end_code,
-                current_search_range,
-                seg_count_x2,
-                entry_selector,
-            )
-        }
-    }
-
+impl CMapSubtable {
     fn find_char_code_segment(file: &File, char_code: u16) -> GlyphId {
         let subtable_format = read_u16(file);
         let length = read_u16(file);
@@ -957,21 +829,121 @@ impl CMapSubtable {
         println!("[CMapSubtable] search_range {:?}", search_range);
         println!("[CMapSubtable] entry_selector {:?}", entry_selector);
         println!("[CMapSubtable] range_shift {:?}", range_shift);
-        println!(
-            "[CMapSubtable] check       {:?}",
-            seg_count_x2 - search_range
-        );
 
-        let glyph_id = Self::seek_glyph_id(
-            file,
-            search_range as i64,
+        let file_ops = FileOps { file };
+
+        let mut index_lookup = GlyphIndexLookup {
+            file_ops,
+            seg_count_x2,
             char_code,
-            seg_count_x2 as i64,
-            entry_selector,
-        );
-        println!("[CMapSubtable] final glyph_id data {:?}", glyph_id);
+        };
 
-        glyph_id
+        index_lookup.seek_glyph_id(search_range, entry_selector)
+    }
+}
+
+struct GlyphIndexLookup<'a> {
+    file_ops: FileOps<'a>,
+    seg_count_x2: u16,
+    char_code: u16,
+}
+
+impl<'a> GlyphIndexLookup<'a> {
+    fn read_start_code(&mut self) -> u16 {
+        self.file_ops.read_start_code(self.seg_count_x2)
+    }
+
+    fn read_id_delta(&mut self) -> u16 {
+        self.file_ops.read_id_delta(self.seg_count_x2)
+    }
+
+    fn read_id_range_offset(&mut self) -> u16 {
+        self.file_ops.read_id_range_offset(self.seg_count_x2)
+    }
+
+    fn read_u16(&mut self) -> u16 {
+        read_u16(self.file_ops.file)
+    }
+
+    fn seek_glyph_id(&mut self, search_range: u16, entry_selector: u16) -> GlyphId {
+        let end_code = self.file_ops.read_end_code(search_range as i64);
+
+        if self.char_code > end_code {
+            self.sequential_search()
+        } else {
+            self.binary_search(end_code, search_range, entry_selector)
+        }
+    }
+
+    fn sequential_search(&mut self) -> GlyphId {
+        self.file_ops.seek(SeekFrom::Current(2));
+
+        let next_end_code = self.read_u16();
+
+        if next_end_code >= self.char_code {
+            self.file_ops.seek(SeekFrom::Current(-2));
+            let start_code = self.read_start_code();
+            let id_delta = self.read_id_delta();
+            let id_range_offset = self.read_id_range_offset();
+
+            self.compute_glyp_id(start_code, id_delta, id_range_offset)
+        } else {
+            if next_end_code == 0xFFFF {
+                GlyphId::MISSING_CHARACTER_GLYPH
+            } else {
+                self.sequential_search()
+            }
+        }
+    }
+
+    fn binary_search(&mut self, end_code: u16, search_range: u16, entry_selector: u16) -> GlyphId {
+        let start_code = self.read_start_code();
+
+        if self.char_code <= end_code && self.char_code > start_code {
+            let id_delta = self.read_id_delta();
+            let id_range_offset = self.read_id_range_offset();
+
+            self.compute_glyp_id(start_code, id_delta, id_range_offset)
+        } else {
+            if entry_selector == 0 {
+                GlyphId::MISSING_CHARACTER_GLYPH
+            } else {
+                let search_range = search_range >> 1;
+
+                self.file_ops
+                    .seek(SeekFrom::Current(-2 - self.seg_count_x2 as i64)); // Go from start_code array (+reservedPad) back to end_code array
+
+                let end_code = if self.char_code < end_code {
+                    self.file_ops.read_end_code(-(search_range as i64))
+                } else {
+                    self.file_ops.read_end_code(search_range as i64)
+                };
+
+                self.binary_search(end_code, search_range, entry_selector - 1)
+            }
+        }
+    }
+
+    fn compute_glyp_id(&mut self, start_code: u16, id_delta: u16, id_range_offset: u16) -> GlyphId {
+        let glyph_id = if id_range_offset > 0 {
+            let address = self.file_ops.read_address();
+
+            let glyph_index_address = id_range_offset as u32
+                + 2 * ((self.char_code - start_code) as u32)
+                + address as u32;
+
+            self.file_ops
+                .seek(SeekFrom::Start(glyph_index_address as u64));
+            self.read_u16() as u32
+        } else {
+            // If the id_range_offset is 0, the id_delta value is added directly to the character code to get the corresponding glyph index
+            id_delta as u32 + self.char_code as u32
+        };
+
+        // NOTE: All id_delta[i] arithmetic is modulo 65536.
+        let glyph_id = (glyph_id % (u16::MAX as u32 + 1)) as u16;
+
+        GlyphId(glyph_id)
     }
 }
 
@@ -1002,6 +974,8 @@ impl CMapTable {
             );
             println!("[CMapTable] offset_{} {}", i, offset);
         }
+
+        // TODO select the best table. (Is it just a coincidence that Unicode table follows first?)
 
         CMapSubtable::find_char_code_segment(file, char_code)
     }
