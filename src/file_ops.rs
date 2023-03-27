@@ -125,4 +125,10 @@ impl FileOps {
             .expect("Can't read table name");
         String::from_utf8_lossy(&tag).to_string()
     }
+
+    pub fn read_string(&mut self, length: u16) -> String {
+        let bytes: Vec<u8> = (0..length).into_iter().map(|_| self.read_u8()).collect();
+
+        String::from_iter(bytes.iter().map(|ch| *ch as char))
+    }
 }

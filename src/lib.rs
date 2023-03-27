@@ -11,6 +11,7 @@ mod font_directory;
 mod glyph_index_lookup;
 mod glyph_reader;
 mod model;
+mod name_table;
 
 // https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6.html
 // https://learn.microsoft.com/en-us/typography/opentype/spec/
@@ -101,24 +102,6 @@ impl IndexToLocTable {
 
         IndexToLocTable { data }
     }
-}
-
-#[derive(Debug)]
-struct GlyphTable {}
-
-impl GlyphTable {
-    // fn mk_glyph_table(
-    //     file_ops: &mut FileOps,
-    //     offset: u32,
-    //     glyph_offset: u32,
-    //     glyph_id: GlyphId,
-    // ) -> GlyphType {
-    //     let offset = offset + glyph_offset;
-
-    //     let mut glyph_reader = GlyphReader { file_ops, offset };
-
-    //     glyph_reader.read_glyph(glyph_id)
-    // }
 }
 
 #[allow(unused)]
@@ -269,6 +252,9 @@ pub fn read_font_file(char_code: u16) -> GlyphType {
     let cmap_table = font_directory.table_directory("cmap");
     let head_table = font_directory.table_directory("head");
     let maxp_table = font_directory.table_directory("maxp");
+    let name_table = font_directory.table_directory("name");
+
+    name_table::read_name(&mut file_ops, name_table);
 
     let head_table = HeadTable::from_file(&mut file_ops, head_table.offset);
 
@@ -301,20 +287,20 @@ mod tests {
     use crate::model::{ArgumentTypes, Contour, Point, PointType};
 
     macro_rules! mk_contour {
-    ($($x:literal, $y:literal - $tpe:ident),*) => {{
-        Contour {
-            points: vec![
-                $(
-                    Point {
-                        x: $x,
-                        y: $y,
-                        tpe: PointType::$tpe,
-                    },
-                )*
-            ],
-        }
-    }};
-}
+        ($($x:literal, $y:literal - $tpe:ident),*) => {{
+            Contour {
+                points: vec![
+                    $(
+                        Point {
+                            x: $x,
+                            y: $y,
+                            tpe: PointType::$tpe,
+                        },
+                    )*
+                ],
+            }
+        }};
+    }
 
     #[test]
     fn test_char_exclamation_mark() {
@@ -430,21 +416,8 @@ mod tests {
         }
     }
 
-    fn abc(c: char) -> u16 {
-        if let Ok(abc) = u16::try_from(c as u32) {
-            abc
-        } else {
-            0
-        }
-    }
-
     #[test]
     fn test_char_aacute() {
-        println!("a      {:?}", b'a');
-        //println!("accute {:?}", abc('á' as u32));
-        println!("accute {:?}", abc('á'));
-        println!("checkerboard {:?}", abc('▒'));
-
         let result = read_font_file('á' as u16);
 
         match result {
@@ -466,8 +439,6 @@ mod tests {
                 assert_eq!(c2.c, 0);
                 assert_eq!(c2.d, 1);
                 assert_eq!(c2.argument_types, ArgumentTypes::XYValue16(159, 0));
-                //println!("{:?}", components);
-                //panic!("Unexpected glyph type")
             }
 
             GlyphType::SimpleGlyph { .. } => panic!("Unexpected glyph type"),
