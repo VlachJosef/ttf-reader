@@ -9,6 +9,9 @@ pub enum PlatformId {
 #[derive(Debug)]
 pub struct FWord(pub i16);
 
+#[derive(Debug)]
+pub struct UFWord(pub u16);
+
 #[allow(unused)]
 #[derive(Debug)]
 pub struct Fixed {

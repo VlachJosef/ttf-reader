@@ -4,6 +4,8 @@ use crate::font_directory::FontDirectory;
 use crate::model::{ArgumentTypes, ComponentData, Glyph, GlyphId};
 use crate::table::cmap_table::CMapSubtable;
 use crate::table::head_table::HeadTable;
+use crate::table::hhea_table::HheaTable;
+use crate::table::htmx_table::HmtxTable;
 use crate::table::loca_table::IndexToLocTable;
 use crate::table::maxp_table::MaximumProfileTable;
 use crate::table::name_table;
@@ -30,6 +32,8 @@ impl GlyphReader {
         let head_table = font_directory.table_directory("head");
         let maxp_table = font_directory.table_directory("maxp");
         let name_table = font_directory.table_directory("name");
+        let hhea_table = font_directory.table_directory("hhea");
+        let htmx_table = font_directory.table_directory("hmtx");
 
         name_table::read_name(&mut file_ops, name_table);
 
@@ -37,6 +41,15 @@ impl GlyphReader {
 
         let maximum_profile_table =
             MaximumProfileTable::from_file(&mut file_ops, maxp_table.offset);
+
+        let hhea_table = HheaTable::from_file(&mut file_ops, hhea_table.offset);
+
+        let htmx_table = HmtxTable::from_file(
+            &mut file_ops,
+            htmx_table.offset,
+            hhea_table,
+            &maximum_profile_table,
+        );
 
         let index_to_loc_table: IndexToLocTable = IndexToLocTable::mk_index_to_loc_table(
             &mut file_ops,

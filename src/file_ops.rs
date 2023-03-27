@@ -1,8 +1,6 @@
-use crate::model::{FWord, Fixed, PlatformId};
+use crate::model::{FWord, Fixed, PlatformId, UFWord};
 use std::fs::File;
-use std::io::Read;
-use std::io::Seek;
-use std::io::SeekFrom;
+use std::io::{Read, Seek, SeekFrom};
 
 pub struct FileOps {
     file: File,
@@ -70,8 +68,13 @@ impl FileOps {
     }
 
     pub fn read_fword(&mut self) -> FWord {
-        let fword = self.read_i16();
-        FWord(fword)
+        let i16 = self.read_i16();
+        FWord(i16)
+    }
+
+    pub fn read_ufword(&mut self) -> UFWord {
+        let u16 = self.read_u16();
+        UFWord(u16)
     }
 
     pub fn read_long_date_time(&mut self) -> i64 {
