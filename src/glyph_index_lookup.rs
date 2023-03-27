@@ -26,7 +26,7 @@ impl<'a> GlyphIndexLookup<'a> {
     pub fn check_first_segment(&mut self) -> Option<GlyphId> {
         let end_code = self.file_ops.read_end_code(0);
         let start_code = self.read_start_code();
-        if self.char_code <= end_code && self.char_code > start_code {
+        if self.char_code <= end_code && self.char_code >= start_code {
             let id_delta = self.read_id_delta();
             let id_range_offset = self.read_id_range_offset();
 

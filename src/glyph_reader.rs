@@ -6,7 +6,7 @@ use crate::table::cmap_table::CMapSubtable;
 use crate::table::head_table::HeadTable;
 use crate::table::hhea_table::HheaTable;
 use crate::table::htmx_table::HmtxTable;
-use crate::table::loca_table::IndexToLocTable;
+use crate::table::loca_table::GlyphIdOffsetLookup;
 use crate::table::maxp_table::MaximumProfileTable;
 use crate::table::name_table;
 use crate::Segment;
@@ -16,7 +16,7 @@ use std::fs::File;
 pub struct GlyphReader {
     file_ops: FileOps,
     glyf_table_offset: u32,
-    index_to_loc_table: IndexToLocTable,
+    glyph_id_offset_lookup: GlyphIdOffsetLookup,
     cmap_subtable: CMapSubtable,
 }
 
@@ -50,13 +50,13 @@ impl GlyphReader {
             hhea_table,
             &maximum_profile_table,
         );
-
-        let index_to_loc_table: IndexToLocTable = IndexToLocTable::mk_index_to_loc_table(
-            &mut file_ops,
-            loca_table.offset,
-            head_table,
-            maximum_profile_table,
-        );
+        let glyph_id_offset_lookup: GlyphIdOffsetLookup =
+            GlyphIdOffsetLookup::mk_glyph_id_to_offset(
+                &mut file_ops,
+                loca_table.offset,
+                &head_table,
+                &maximum_profile_table,
+            );
 
         let cmap_subtable: CMapSubtable =
             CMapSubtable::find_cmap_subtable(&mut file_ops, cmap_table);
@@ -66,7 +66,7 @@ impl GlyphReader {
         GlyphReader {
             file_ops,
             glyf_table_offset,
-            index_to_loc_table,
+            glyph_id_offset_lookup,
             cmap_subtable,
         }
     }
@@ -101,7 +101,11 @@ impl GlyphReader {
     }
 
     fn read(&mut self, glyph_id: GlyphId) -> Glyph {
-        let glyph_offset = self.index_to_loc_table.index_for(&glyph_id);
+        let glyph_offset = self
+            .glyph_id_offset_lookup
+            .0
+            .get(&glyph_id)
+            .expect(&format!("{:?} not found in lookup map", glyph_id));
 
         if glyph_offset.is_empty() {
             Glyph::Empty { glyph_id }

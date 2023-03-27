@@ -19,7 +19,7 @@ pub struct Fixed {
     pub minor: u16,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct GlyphId(u16);
 
 impl GlyphId {

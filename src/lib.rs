@@ -44,6 +44,7 @@ pub fn cmap_table_segments(file_path: &str) -> Vec<Segment> {
 
 pub fn all_glyphs(file_path: &str) -> Vec<Glyph> {
     let mut glyph_reader = mk_glyph_reader(file_path);
+
     let all_chars: Vec<u16> = glyph_reader.all_char_codes();
 
     let all_glyphs: Vec<Glyph> = all_chars
@@ -176,7 +177,7 @@ mod tests {
             .collect();
 
         let expected_mapping: Vec<(u16, GlyphId)> = vec![
-            (32, GlyphId::new(0)),
+            (32, GlyphId::new(3)),
             (33, GlyphId::new(4)),
             (34, GlyphId::new(5)),
             (35, GlyphId::new(6)),
