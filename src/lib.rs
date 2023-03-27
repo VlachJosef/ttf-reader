@@ -59,6 +59,11 @@ pub fn all_glyphs(file_path: &str) -> Vec<Glyph> {
     all_glyphs
 }
 
+pub fn display_font_info(file_path: &str) {
+    let mut glyph_reader = mk_glyph_reader(file_path);
+    glyph_reader.display_font_info()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

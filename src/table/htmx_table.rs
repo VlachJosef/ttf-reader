@@ -1,5 +1,5 @@
 use crate::file_ops::FileOps;
-use crate::model::{FWord, GlyphId};
+use crate::model::GlyphId;
 use crate::table::hhea_table::HheaTable;
 use crate::table::maxp_table::MaximumProfileTable;
 use std::collections::HashMap;

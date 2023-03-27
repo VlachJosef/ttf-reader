@@ -19,9 +19,16 @@ pub struct GlyphReader {
     glyph_id_offset_lookup: GlyphIdOffsetLookup,
     cmap_subtable: CMapSubtable,
     long_hor_metric_lookup: LongHorMetricLookup,
+    font_directory: FontDirectory,
 }
 
 impl GlyphReader {
+    pub fn display_font_info(&mut self) {
+        let name_table = self.font_directory.table_directory("name");
+
+        name_table::read_name(&mut self.file_ops, name_table);
+    }
+
     pub fn from_file(file: File) -> GlyphReader {
         let mut file_ops: FileOps = FileOps::from_file(file);
 
@@ -32,11 +39,8 @@ impl GlyphReader {
         let cmap_table = font_directory.table_directory("cmap");
         let head_table = font_directory.table_directory("head");
         let maxp_table = font_directory.table_directory("maxp");
-        let name_table = font_directory.table_directory("name");
         let hhea_table = font_directory.table_directory("hhea");
         let htmx_table = font_directory.table_directory("hmtx");
-
-        //name_table::read_name(&mut file_ops, name_table);
 
         let head_table = HeadTable::from_file(&mut file_ops, head_table.offset);
 
@@ -70,6 +74,7 @@ impl GlyphReader {
             glyph_id_offset_lookup,
             cmap_subtable,
             long_hor_metric_lookup,
+            font_directory,
         }
     }
 
@@ -105,16 +110,15 @@ impl GlyphReader {
             .glyph_id_offset_lookup
             .0
             .get(&glyph_id)
-            .expect(&format!("{:?} not found in lookup map", glyph_id));
+            .unwrap_or_else(|| panic!("{:?} not found in lookup map", glyph_id));
 
         let long_hor_metric = self
             .long_hor_metric_lookup
             .0
             .get(&glyph_id)
-            .expect(&format!(
-                "long_hor_metric for {:?} not found in lookup map",
-                glyph_id
-            ));
+            .unwrap_or_else(|| {
+                panic!("long_hor_metric for {:?} not found in lookup map", glyph_id)
+            });
 
         let advance_width = long_hor_metric.advance_width;
         let left_side_bearing = long_hor_metric.left_side_bearing;
@@ -185,9 +189,8 @@ impl<'a> Iterator for GlyphComponent<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.has_more {
-            //let file_ops = &self.file_ops;
             let component_flag = ComponentFlag::from_file(self.file_ops);
-            //component_flag.pretty_print();
+
             let glyph_index = self.file_ops.read_u16();
             let argument_types = if component_flag.arg1_and_arg2_are_words() {
                 if component_flag.args_are_xy_values() {
@@ -199,16 +202,14 @@ impl<'a> Iterator for GlyphComponent<'a> {
                     let arg2 = self.file_ops.read_u16();
                     ArgumentTypes::Point16(arg1, arg2)
                 }
+            } else if component_flag.args_are_xy_values() {
+                let arg1 = self.file_ops.read_i8();
+                let arg2 = self.file_ops.read_i8();
+                ArgumentTypes::XYValue8(arg1, arg2)
             } else {
-                if component_flag.args_are_xy_values() {
-                    let arg1 = self.file_ops.read_i8();
-                    let arg2 = self.file_ops.read_i8();
-                    ArgumentTypes::XYValue8(arg1, arg2)
-                } else {
-                    let arg1 = self.file_ops.read_u8();
-                    let arg2 = self.file_ops.read_u8();
-                    ArgumentTypes::Point8(arg1, arg2)
-                }
+                let arg1 = self.file_ops.read_u8();
+                let arg2 = self.file_ops.read_u8();
+                ArgumentTypes::Point8(arg1, arg2)
             };
 
             let (a, b, c, d) = if component_flag.we_have_a_scale() {

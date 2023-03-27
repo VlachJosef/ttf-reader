@@ -27,12 +27,10 @@ impl<'a> ContoursReader<'a> {
                 } else {
                     -coor
                 }
+            } else if is_same(contour_flag) {
+                0
             } else {
-                if is_same(contour_flag) {
-                    0
-                } else {
-                    self.file_ops.read_i16()
-                }
+                self.file_ops.read_i16()
             };
             let coordinate = last_elem + coordinate;
             coordinates.push(coordinate);

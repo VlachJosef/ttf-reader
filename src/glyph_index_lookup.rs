@@ -64,12 +64,10 @@ impl<'a> GlyphIndexLookup<'a> {
             let id_range_offset = self.read_id_range_offset();
 
             self.compute_glyp_id(start_code, id_delta, id_range_offset)
+        } else if next_end_code == 0xFFFF {
+            GlyphId::MISSING_CHARACTER_GLYPH
         } else {
-            if next_end_code == 0xFFFF {
-                GlyphId::MISSING_CHARACTER_GLYPH
-            } else {
-                self.sequential_search()
-            }
+            self.sequential_search()
         }
     }
 
@@ -81,22 +79,20 @@ impl<'a> GlyphIndexLookup<'a> {
             let id_range_offset = self.read_id_range_offset();
 
             self.compute_glyp_id(start_code, id_delta, id_range_offset)
+        } else if entry_selector == 0 {
+            GlyphId::MISSING_CHARACTER_GLYPH
         } else {
-            if entry_selector == 0 {
-                GlyphId::MISSING_CHARACTER_GLYPH
+            let search_range = search_range >> 1;
+
+            let end_code_range = if self.char_code < end_code {
+                -(search_range as i32)
             } else {
-                let search_range = search_range >> 1;
+                search_range as i32
+            };
 
-                let end_code_range = if self.char_code < end_code {
-                    -(search_range as i32)
-                } else {
-                    search_range as i32
-                };
-
-                self.reset_to_end_code_read();
-                let end_code = self.file_ops.read_end_code(end_code_range);
-                self.binary_search(end_code, search_range, entry_selector - 1)
-            }
+            self.reset_to_end_code_read();
+            let end_code = self.file_ops.read_end_code(end_code_range);
+            self.binary_search(end_code, search_range, entry_selector - 1)
         }
     }
 

@@ -24,7 +24,7 @@ impl FontDirectory {
     pub fn table_directory(&self, name: &str) -> &TableDirectory {
         let maybe_loca_table: Option<&TableDirectory> =
             self.table_dictionary.iter().find(|td| td.tag == name);
-        maybe_loca_table.expect(&format!("'{name}' table not found"))
+        maybe_loca_table.unwrap_or_else(|| panic!("'{name}' table not found"))
     }
 }
 
