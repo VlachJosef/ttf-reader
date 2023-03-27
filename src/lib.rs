@@ -124,8 +124,8 @@ struct IndexToLocTable {
 }
 
 impl IndexToLocTable {
-    fn index_for(&self, x: u16) -> u32 {
-        self.data[x as usize]
+    fn index_for(&self, glyph_id: &GlyphId) -> u32 {
+        self.data[glyph_id.0 as usize]
     }
 
     fn mk_index_to_loc_table(
@@ -251,7 +251,7 @@ impl<'a> Iterator for GlyphComponent<'a> {
 }
 
 impl GlyphTable {
-    fn read_glyph(file: &File, index: u16) -> GlyphData {
+    fn read_glyph(file: &File, glyph_id: GlyphId) -> GlyphData {
         let number_of_contours = read_i16(file);
         let x_min = read_fword(file);
         let y_min = read_fword(file);
@@ -264,7 +264,7 @@ impl GlyphTable {
             let simple_glyph = SimpleGlyph::mk_simple_glyph(file, number_of_contours);
             let contours = simple_glyph.contours;
             GlyphData::SimpleGlyph {
-                index,
+                glyph_id,
                 x_min,
                 x_max,
                 y_min,
@@ -284,11 +284,16 @@ impl GlyphTable {
         }
     }
 
-    fn mk_glyph_table(mut file: &File, offset: u64, glyph_offset: u32, index: u16) -> GlyphData {
+    fn mk_glyph_table(
+        mut file: &File,
+        offset: u64,
+        glyph_offset: u32,
+        glyph_id: GlyphId,
+    ) -> GlyphData {
         file.seek(SeekFrom::Start(offset + glyph_offset as u64))
             .expect("Expected be able to seek");
 
-        Self::read_glyph(file, index)
+        Self::read_glyph(file, glyph_id)
     }
 }
 
@@ -502,7 +507,7 @@ impl ControlPointsFlags {
 #[derive(Debug)]
 pub enum GlyphData {
     SimpleGlyph {
-        index: u16,
+        glyph_id: GlyphId,
         x_min: FWord, // Minimum x for coordinate data
         y_min: FWord, // Minimum y for coordinate data
         x_max: FWord, // Maximum x for coordinate data
@@ -729,12 +734,19 @@ enum PlatformId {
     Microsoft,
 }
 
+#[derive(Debug)]
+pub struct GlyphId(u16);
+
+impl GlyphId {
+    const MISSING_CHARACTER_GLYPH: GlyphId = GlyphId(0);
+}
+
 struct CMapSubtable {}
 
 #[allow(unused)]
 #[derive(Debug)]
 struct Segment {
-    glyph_id: u16,
+    glyph_id: GlyphId,
     start_code: u16,
     end_code: u16,
     id_delta: u16,
@@ -742,134 +754,206 @@ struct Segment {
 }
 
 impl CMapSubtable {
-    fn seek_glyph_id(
-        mut file: &File,
-        seeking_at: i64,
-        char_code: u16,
-        seg_count: u16,
-        counter: u16,
-    ) -> Segment {
-        file.seek(SeekFrom::Current(2 * seeking_at))
-            .expect("Expected be able to seek");
+    fn seek(mut file: &File, seek_from: SeekFrom) {
+        file.seek(seek_from).expect("Expected be able to seek");
+    }
 
+    fn read_end_code(file: &File, current_search_range: i64) -> u16 {
+        Self::seek(file, SeekFrom::Current(current_search_range));
         let end_code = read_u16(file);
 
         // Reset last read offset shift
-        file.seek(SeekFrom::Current(-2))
-            .expect("Expected be able to seek");
+        Self::seek(file, SeekFrom::Current(-2));
 
-        file.seek(SeekFrom::Current((2 + 2 * seg_count) as i64))
-            .expect("Expected be able to seek");
+        end_code
+    }
+    fn read_start_code(file: &File, seg_count_x2: i64) -> u16 {
+        Self::seek(file, SeekFrom::Current(2)); // Skip reservedPad
+        Self::seek(file, SeekFrom::Current(seg_count_x2));
 
         let start_code = read_u16(file);
 
         // Reset last read offset shift
-        file.seek(SeekFrom::Current(-2))
-            .expect("Expected be able to seek");
+        Self::seek(file, SeekFrom::Current(-2));
+
+        start_code
+    }
+
+    fn read_id_delta(file: &File, seg_count_x2: i64) -> u16 {
+        Self::seek(file, SeekFrom::Current(seg_count_x2));
+
+        let id_delta = read_u16(file);
+
+        Self::seek(file, SeekFrom::Current(-2));
+
+        id_delta
+    }
+
+    fn read_id_range_offset(file: &File, seg_count_x2: i64) -> u16 {
+        Self::seek(file, SeekFrom::Current(seg_count_x2));
+
+        let id_range_offset = read_u16(file);
+
+        Self::seek(file, SeekFrom::Current(-2));
+
+        id_range_offset
+    }
+
+    fn read_address(mut file: &File) -> u64 {
+        file.stream_position()
+            .expect("Expected to read stream position")
+    }
+
+    fn compute_glyp_id(
+        file: &File,
+        char_code: u16,
+        start_code: u16,
+        id_delta: u16,
+        id_range_offset: u16,
+    ) -> GlyphId {
+        let glyph_id = if id_range_offset > 0 {
+            let address = Self::read_address(file);
+
+            println!("address {}", address);
+            println!("char_code {}", char_code);
+            println!("id_delta {}", id_delta);
+            println!("start_code {}", start_code);
+            println!("id_range_offset {}", id_range_offset);
+
+            let glyph_index_address =
+                id_range_offset as u32 + 2 * ((char_code - start_code) as u32) + address as u32;
+
+            Self::seek(file, SeekFrom::Start(glyph_index_address as u64));
+            read_u16(file) as u32
+        } else {
+            // If the id_range_offset is 0, the id_delta value is added directly to the character code to get the corresponding glyph index
+            id_delta as u32 + char_code as u32
+        };
+
+        // NOTE: All id_delta[i] arithmetic is modulo 65536.
+        let glyph_id = (glyph_id % (u16::MAX as u32 + 1)) as u16;
+
+        GlyphId(glyph_id)
+    }
+
+    fn binary_search(
+        file: &File,
+        char_code: u16,
+        end_code: u16,
+        current_search_range: i64,
+        seg_count_x2: i64,
+        entry_selector: u16,
+    ) -> GlyphId {
+        let start_code = Self::read_start_code(file, seg_count_x2);
 
         println!(
-            "[CMapSubtable] seek_glyph_id level {} char_code {} seek {} start_code {} end_code {:?} :: {}",
-            counter,
+            "[CMapSubtable] seek_glyph_id level {} char_code {} seek {} start_code {} end_code {:?} ",
+            entry_selector,
             char_code,
-            seeking_at,
+            current_search_range,
             start_code,
-            end_code,
-            if char_code < end_code {
-                "left"
-            } else {
-                "right"
-            }
+            end_code
         );
 
-        if counter > 0 {
-            if char_code <= end_code && char_code > start_code {
-                file.seek(SeekFrom::Current((2 * seg_count) as i64))
-                    .expect("Expected be able to seek");
-                let id_delta = read_u16(file);
-                file.seek(SeekFrom::Current(-2))
-                    .expect("Expected be able to seek");
-                file.seek(SeekFrom::Current((2 * seg_count) as i64))
-                    .expect("Expected be able to seek");
-                let id_range_offset = read_u16(file);
-                let glyph_id = if id_range_offset > 0 {
-                    file.seek(SeekFrom::Current(-2))
-                        .expect("Expected be able to seek");
-                    let address = file.stream_position().unwrap();
-                    //let char_offset = char_code - start_code;
-                    println!("address {}", address);
-                    println!("char_code {}", char_code);
-                    println!("id_delta {}", id_delta);
-                    println!("start_code {}", start_code);
-                    println!("id_range_offset {}", id_range_offset);
-                    //let offset = (char_code - start_code + id_range_offset) as i64; // Is this [start_code] or [char_code - start_code] ?
-                    //file.seek(SeekFrom::Current(offset));
-                    //let id_range_offset_value = read_u16(file);
-                    //println!("id_range_offset_value {}", id_range_offset_value);
-                    let glyph_index_address = id_range_offset as u32
-                        + 2 * ((char_code - start_code) as u32)
-                        + address as u32;
+        if char_code <= end_code && char_code > start_code {
+            let id_delta = Self::read_id_delta(file, seg_count_x2);
+            let id_range_offset = Self::read_id_range_offset(file, seg_count_x2);
 
-                    file.seek(SeekFrom::Start(glyph_index_address as u64))
-                        .expect("Expected be able to seek");
-                    read_u16(file) as u32
-                } else {
-                    // If the id_range_offset is 0, the id_delta value is added directly to the character code to get the corresponding glyph index
-                    id_delta as u32 + char_code as u32
-                };
-
-                // NOTE: All id_delta[i] arithmetic is modulo 65536.
-                let glyph_id = (glyph_id % (u16::MAX as u32 + 1)) as u16;
-                Segment {
-                    glyph_id,
-                    start_code,
-                    end_code,
-                    id_delta,
-                    id_range_offset,
-                }
+            Self::compute_glyp_id(file, char_code, start_code, id_delta, id_range_offset)
+        } else {
+            if entry_selector == 0 {
+                GlyphId::MISSING_CHARACTER_GLYPH
             } else {
-                // We need to seek back to end_code array position
-                file.seek(SeekFrom::Current(-2 - 2 * seg_count as i64))
-                    .expect("Expected be able to seek");
+                let current_search_range = current_search_range >> 1;
+
+                Self::seek(file, SeekFrom::Current(-2 - seg_count_x2)); // Go from start_code array (+reservedPad) back to end_code array
+
                 if char_code < end_code {
-                    Self::seek_glyph_id(
+                    let end_code = Self::read_end_code(file, -current_search_range);
+                    //println!("{} {} GOING LEFT ---->>> ", current_search_range, end_code);
+                    Self::binary_search(
                         file,
-                        -(seeking_at.abs()) / 2,
                         char_code,
-                        seg_count,
-                        counter - 1,
+                        end_code,
+                        current_search_range,
+                        seg_count_x2,
+                        entry_selector - 1,
                     )
                 } else {
-                    Self::seek_glyph_id(
+                    //println!("{} {} GOING RIGHT ---->>>", current_search_range, end_code);
+                    let end_code = Self::read_end_code(file, current_search_range);
+                    Self::binary_search(
                         file,
-                        seeking_at.abs() / 2,
                         char_code,
-                        seg_count,
-                        counter - 1,
+                        end_code,
+                        current_search_range,
+                        seg_count_x2,
+                        entry_selector - 1,
                     )
                 }
             }
-        } else {
-            //const MISSING_CHARACTER_GLYPH: u16 = 0;
-            todo!("Get rid of counter")
         }
     }
 
-    fn find_char_code_segment(file: &File, char_code: u16) -> Segment {
+    fn sequential_search(file: &File, char_code: u16, seg_count_x2: i64) -> GlyphId {
+        Self::seek(file, SeekFrom::Current(2));
+
+        let next_end_code = read_u16(file);
+
+        if next_end_code >= char_code {
+            Self::seek(file, SeekFrom::Current(-2));
+            let start_code = Self::read_start_code(file, seg_count_x2);
+            let id_delta = Self::read_id_delta(file, seg_count_x2);
+            let id_range_offset = Self::read_id_range_offset(file, seg_count_x2);
+
+            Self::compute_glyp_id(file, char_code, start_code, id_delta, id_range_offset)
+        } else {
+            if next_end_code == 0xFFFF {
+                GlyphId::MISSING_CHARACTER_GLYPH
+            } else {
+                Self::sequential_search(file, char_code, seg_count_x2)
+            }
+        }
+    }
+
+    fn seek_glyph_id(
+        file: &File,
+        current_search_range: i64,
+        char_code: u16,
+        seg_count_x2: i64,
+        entry_selector: u16,
+    ) -> GlyphId {
+        let end_code = Self::read_end_code(file, current_search_range);
+
+        if char_code > end_code {
+            Self::sequential_search(file, char_code, seg_count_x2)
+        } else {
+            Self::binary_search(
+                file,
+                char_code,
+                end_code,
+                current_search_range,
+                seg_count_x2,
+                entry_selector,
+            )
+        }
+    }
+
+    fn find_char_code_segment(file: &File, char_code: u16) -> GlyphId {
         let subtable_format = read_u16(file);
         let length = read_u16(file);
         let version = read_u16(file);
 
-        let seg_count_x2 = read_u16(file);
-        let seg_count = seg_count_x2 / 2; // The segCount is the number of contiguous code ranges in the font
-        let search_range = read_u16(file);
-        let entry_selector = read_u16(file);
-        let range_shift = read_u16(file);
+        let seg_count_x2 = read_u16(file); // The segCount is the number of contiguous code ranges in the font
+        let search_range = read_u16(file); // TODO compute this from seg_count_x2
+        let entry_selector = read_u16(file); // TODO compute this from seg_count_x2
+        let range_shift = read_u16(file); // Do not use
 
         println!("[CMapSubtable] subtable_format {:?}", subtable_format);
         println!("[CMapSubtable] length {:?}", length);
         println!("[CMapSubtable] version {:?}", version);
         println!("[CMapSubtable] seg_count_x2 {:?}", seg_count_x2);
-        println!("[CMapSubtable] seg_count    {:?}", seg_count);
+        //println!("[CMapSubtable] seg_count    {:?}", seg_count);
         println!("[CMapSubtable] search_range {:?}", search_range);
         println!("[CMapSubtable] entry_selector {:?}", entry_selector);
         println!("[CMapSubtable] range_shift {:?}", range_shift);
@@ -878,13 +962,16 @@ impl CMapSubtable {
             seg_count_x2 - search_range
         );
 
-        let seeking_at: i64 = (search_range / 2) as i64;
+        let glyph_id = Self::seek_glyph_id(
+            file,
+            search_range as i64,
+            char_code,
+            seg_count_x2 as i64,
+            entry_selector,
+        );
+        println!("[CMapSubtable] final glyph_id data {:?}", glyph_id);
 
-        let segment =
-            Self::seek_glyph_id(file, seeking_at, char_code, seg_count, entry_selector + 1);
-        println!("[CMapSubtable] final segment data {:?}", segment);
-
-        segment
+        glyph_id
     }
 }
 
@@ -894,7 +981,7 @@ struct CMapTable {
 }
 
 impl CMapTable {
-    fn mk_cmap_table(mut file: &File, offset: u64, char_code: u16) -> Segment {
+    fn mk_cmap_table(mut file: &File, offset: u64, char_code: u16) -> GlyphId {
         file.seek(SeekFrom::Start(offset))
             .expect("Expected be able to seek");
 
@@ -1035,14 +1122,13 @@ pub fn read_font_file(char_code: u16) -> GlyphData {
 
     println!("Read {:?} os", glyf_table);
 
-    let segment = CMapTable::mk_cmap_table(&file, cmap_table.offset as u64, char_code);
-    let a_glyph_id = segment.glyph_id;
+    let glyph_id = CMapTable::mk_cmap_table(&file, cmap_table.offset as u64, char_code);
 
-    let glyph_offset = lolll.index_for(a_glyph_id);
+    let glyph_offset = lolll.index_for(&glyph_id);
 
+    println!("glyph_id {:?} glyph_offset {} ", glyph_id, glyph_offset);
     let glyph_table_content =
-        GlyphTable::mk_glyph_table(&file, glyf_table.offset as u64, glyph_offset, a_glyph_id);
-    println!("a_glyph_id {:?} ", a_glyph_id);
+        GlyphTable::mk_glyph_table(&file, glyf_table.offset as u64, glyph_offset, glyph_id);
     println!("glyph_offset {:?} ", glyph_offset);
     println!("glyph_table_content {:?}", glyph_table_content);
 
@@ -1076,14 +1162,14 @@ mod tests {
         match result {
             GlyphData::CompountGlyph { .. } => panic!("Unexpected glyph type"),
             GlyphData::SimpleGlyph {
-                index,
+                glyph_id,
                 x_min,
                 x_max,
                 y_min,
                 y_max,
                 contours,
             } => {
-                assert_eq!(index, 4);
+                assert_eq!(glyph_id.0, 4);
                 assert_eq!(x_min.0, 471);
                 assert_eq!(x_max.0, 758);
                 assert_eq!(y_min.0, -47);
@@ -1126,14 +1212,14 @@ mod tests {
         match result {
             GlyphData::CompountGlyph { .. } => panic!("Unexpected glyph type"),
             GlyphData::SimpleGlyph {
-                index,
+                glyph_id,
                 x_min,
                 x_max,
                 y_min,
                 y_max,
                 contours,
             } => {
-                assert_eq!(index, 68);
+                assert_eq!(glyph_id.0, 68);
                 assert_eq!(x_min.0, 102);
                 assert_eq!(x_max.0, 1118);
                 assert_eq!(y_min.0, -31);
@@ -1224,6 +1310,107 @@ mod tests {
             }
 
             GlyphData::SimpleGlyph { .. } => panic!("Unexpected glyph type"),
+        }
+    }
+
+    #[test]
+    fn test_char_medium_shade() {
+        let result = read_font_file('▒' as u16);
+
+        match result {
+            GlyphData::CompountGlyph { .. } => panic!("Unexpected glyph type"),
+            GlyphData::SimpleGlyph {
+                glyph_id,
+                x_min,
+                x_max,
+                y_min,
+                y_max,
+                contours,
+            } => {
+                assert_eq!(glyph_id.0, 1676);
+                assert_eq!(x_min.0, 1);
+                assert_eq!(x_max.0, 1024);
+                assert_eq!(y_min.0, -202);
+                assert_eq!(y_max.0, 1555);
+
+                #[rustfmt::skip]
+                let expected_contours = vec![
+                    mk_contour!(
+                        773, 1261 - OnCurve,
+                        520, 1262 - OnCurve,
+                        521, 1553 - OnCurve,
+                        772, 1555 - OnCurve
+                    ),
+                    mk_contour!(
+                        252, 1262 - OnCurve,
+                        1, 1262 - OnCurve,
+                        1, 1555 - OnCurve,
+                        254, 1553 - OnCurve
+                    ),
+                    mk_contour!(
+                        515, 969 - OnCurve,
+                        264, 969 - OnCurve,
+                        264, 1262 - OnCurve,
+                        516, 1261 - OnCurve
+                    ),
+                    mk_contour!(
+                        1024, 968 - OnCurve,
+                        771, 969 - OnCurve,
+                        772, 1261 - OnCurve,
+                        1022, 1262 - OnCurve
+                    ),
+                    mk_contour!(
+                        773, 676 - OnCurve,
+                        520, 677 - OnCurve,
+                        521, 968 - OnCurve,
+                        772, 969 - OnCurve
+                    ),
+                    mk_contour!(
+                        252, 677 - OnCurve,
+                        1, 677 - OnCurve,
+                        1, 969 - OnCurve,
+                        254, 968 - OnCurve
+                    ),
+                    mk_contour!(
+                        515, 385 - OnCurve,
+                        264, 385 - OnCurve,
+                        264, 677 - OnCurve,
+                        516, 676 - OnCurve
+                    ),
+                    mk_contour!(
+                        1024, 384 - OnCurve,
+                        771, 385 - OnCurve,
+                        772, 676 - OnCurve,
+                        1022, 677 - OnCurve
+                    ),
+                    mk_contour!(
+                        773, 91 - OnCurve,
+                        520, 92 - OnCurve,
+                        521, 384 - OnCurve,
+                        772, 385 - OnCurve
+                    ),
+                    mk_contour!(
+                        252, 92 - OnCurve,
+                        1, 92 - OnCurve,
+                        1, 385 - OnCurve,
+                        254, 384 - OnCurve
+                    ),
+                    mk_contour!(
+                        515, -200 - OnCurve,
+                        264, -200 - OnCurve,
+                        264, 92 - OnCurve,
+                        516, 91 - OnCurve
+                    ),
+                    mk_contour!(
+                        1024, -202 - OnCurve,
+                        771, -200 - OnCurve,
+                        772, 91 - OnCurve,
+                        1022, 92 - OnCurve
+                    )
+                ];
+
+                assert_eq!(contours, expected_contours);
+            }
         }
     }
 }
