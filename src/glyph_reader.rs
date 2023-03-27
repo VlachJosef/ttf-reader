@@ -161,6 +161,10 @@ impl GlyphReader {
 
                 Glyph::Compount {
                     glyph_id,
+                    x_min,
+                    x_max,
+                    y_min,
+                    y_max,
                     advance_width,
                     left_side_bearing,
                     components,

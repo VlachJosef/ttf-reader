@@ -900,14 +900,22 @@ mod tests {
             Glyph::Empty { .. } => panic!("Expected Compount glyph"),
             Glyph::Compount {
                 glyph_id,
+                x_min,
+                x_max,
+                y_min,
+                y_max,
                 advance_width,
                 left_side_bearing,
                 components,
             } => {
                 assert_eq!(glyph_id.id(), 105);
-                assert_eq!(components.len(), 2);
+                assert_eq!(x_min.0, 102);
+                assert_eq!(x_max.0, 1118);
+                assert_eq!(y_min.0, -31);
+                assert_eq!(y_max.0, 1614);
                 assert_eq!(advance_width, 1229);
                 assert_eq!(left_side_bearing, 102);
+                assert_eq!(components.len(), 2);
 
                 let c1 = &components[0];
                 let c2 = &components[1];

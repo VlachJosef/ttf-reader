@@ -53,6 +53,10 @@ pub enum Glyph {
     },
     Compount {
         glyph_id: GlyphId,
+        x_min: FWord,
+        y_min: FWord,
+        x_max: FWord,
+        y_max: FWord,
         advance_width: u16,
         left_side_bearing: i16,
         components: Vec<ComponentData>,
