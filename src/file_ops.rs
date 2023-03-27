@@ -134,4 +134,13 @@ impl FileOps {
 
         String::from_iter(bytes.iter().map(|ch| *ch as char))
     }
+
+    pub fn read_utf_16be(&mut self, length: u16) -> String {
+        let bytes: Vec<u16> = (0..(length / 2))
+            .into_iter()
+            .map(|_| self.read_u16())
+            .collect();
+
+        String::from_utf16(&bytes).unwrap()
+    }
 }

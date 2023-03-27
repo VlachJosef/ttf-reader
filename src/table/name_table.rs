@@ -26,13 +26,21 @@ impl NameId {
             4 => "Full name of the font",
             5 => "Version of the name table",
             6 => "PostScript name",
+            7 => "Trademark notice",
+            8 => "Manufacturer name",
+            9 => "Designer",
+            10 => "Description",
+            11 => "URL of the font vendor",
+            12 => "URL of the font designer",
+            13 => "License description",
+            14 => "License information",
             _ => "other",
         }
     }
 }
 
-pub fn read_name(file_ops: &mut FileOps, td: &TableDirectory) {
-    file_ops.seek_from_start(td.offset);
+pub fn read_name(file_ops: &mut FileOps, name_table: &TableDirectory) {
+    file_ops.seek_from_start(name_table.offset);
 
     let format = file_ops.read_u16();
     let count = file_ops.read_u16();
@@ -64,13 +72,20 @@ pub fn read_name(file_ops: &mut FileOps, td: &TableDirectory) {
 
     name_records.iter().for_each(|nr| {
         if nr.platform_id == PlatformId::Macintosh && nr.language_id == 0 {
-            file_ops.seek_from_start(td.offset);
+            file_ops.seek_from_start(name_table.offset);
             file_ops.seek_from_current((string_offset + nr.offset) as i32);
 
             let str_value = file_ops.read_string(nr.length);
             let info = nr.name_id.info();
 
-            println!("{}: {}", info, str_value);
+            println!("[Macintosh] {}: {}", info, str_value);
+        } else if nr.platform_id == PlatformId::Microsoft && nr.language_id == 1033 {
+            file_ops.seek_from_start(name_table.offset);
+            file_ops.seek_from_current((string_offset + nr.offset) as i32);
+
+            let str_value = file_ops.read_utf_16be(nr.length);
+            let info = nr.name_id.info();
+            println!("[Microsolf] {}: {}", info, str_value);
         }
     });
 }
