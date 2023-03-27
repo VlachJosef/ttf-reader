@@ -560,7 +560,7 @@ impl Contours {
 
         println!("SOURCE end_pts_of_contours {:?}", end_pts_of_contours);
 
-        file_ops.seek(SeekFrom::Current(instruction_length as i64)); // Skip instructions
+        file_ops.seek_from_current(instruction_length as i32); // Skip instructions
 
         end_pts_of_contours.insert(0, 0);
 
@@ -736,47 +736,52 @@ impl FileOps {
     fn seek_from_start(&mut self, seek_from: u32) {
         self.seek(SeekFrom::Start(seek_from as u64));
     }
+
+    fn seek_from_current(&mut self, seek_from: i32) {
+        self.seek(SeekFrom::Current(seek_from as i64));
+    }
+
     fn seek(&mut self, seek_from: SeekFrom) {
         self.file.seek(seek_from).expect("Expected be able to seek");
     }
 
-    fn read_end_code(&mut self, current_search_range: i64) -> u16 {
-        self.seek(SeekFrom::Current(current_search_range));
+    fn read_end_code(&mut self, search_range: i32) -> u16 {
+        self.seek_from_current(search_range);
         let end_code = self.read_u16();
 
         // Reset last read offset shift
-        self.seek(SeekFrom::Current(-2));
+        self.seek_from_current(-2);
 
         end_code
     }
     fn read_start_code(&mut self, seg_count_x2: u16) -> u16 {
-        self.seek(SeekFrom::Current(2)); // Skip reservedPad
-        self.seek(SeekFrom::Current(seg_count_x2 as i64));
+        self.seek_from_current(2); // Skip reservedPad
+        self.seek_from_current(seg_count_x2 as i32);
 
         let start_code = self.read_u16();
 
         // Reset last read offset shift
-        self.seek(SeekFrom::Current(-2));
+        self.seek_from_current(-2);
 
         start_code
     }
 
     fn read_id_delta(&mut self, seg_count_x2: u16) -> u16 {
-        self.seek(SeekFrom::Current(seg_count_x2 as i64));
+        self.seek_from_current(seg_count_x2 as i32);
 
         let id_delta = self.read_u16();
 
-        self.seek(SeekFrom::Current(-2));
+        self.seek_from_current(-2);
 
         id_delta
     }
 
     fn read_id_range_offset(&mut self, seg_count_x2: u16) -> u16 {
-        self.seek(SeekFrom::Current(seg_count_x2 as i64));
+        self.seek_from_current(seg_count_x2 as i32);
 
         let id_range_offset = self.read_u16();
 
-        self.seek(SeekFrom::Current(-2));
+        self.seek_from_current(-2);
 
         id_range_offset
     }
@@ -906,7 +911,7 @@ impl<'a> GlyphIndexLookup<'a> {
     }
 
     fn seek_glyph_id(&mut self, search_range: u16, entry_selector: u16) -> GlyphId {
-        let end_code = self.file_ops.read_end_code(search_range as i64);
+        let end_code = self.file_ops.read_end_code(search_range as i32);
 
         if self.char_code > end_code {
             self.sequential_search()
@@ -916,12 +921,12 @@ impl<'a> GlyphIndexLookup<'a> {
     }
 
     fn sequential_search(&mut self) -> GlyphId {
-        self.file_ops.seek(SeekFrom::Current(2));
+        self.file_ops.seek_from_current(2);
 
         let next_end_code = self.file_ops.read_u16();
 
         if next_end_code >= self.char_code {
-            self.file_ops.seek(SeekFrom::Current(-2));
+            self.file_ops.seek_from_current(-2);
             let start_code = self.read_start_code();
             let id_delta = self.read_id_delta();
             let id_range_offset = self.read_id_range_offset();
@@ -950,15 +955,16 @@ impl<'a> GlyphIndexLookup<'a> {
             } else {
                 let search_range = search_range >> 1;
 
-                self.file_ops
-                    .seek(SeekFrom::Current(-2 - self.seg_count_x2 as i64)); // Go from start_code array (+reservedPad) back to end_code array
-
-                let end_code = if self.char_code < end_code {
-                    self.file_ops.read_end_code(-(search_range as i64))
+                let end_code_range = if self.char_code < end_code {
+                    -(search_range as i32)
                 } else {
-                    self.file_ops.read_end_code(search_range as i64)
+                    search_range as i32
                 };
 
+                // Go from start_code array (+reservedPad) back to end_code array
+                self.file_ops
+                    .seek_from_current(-2 - self.seg_count_x2 as i32);
+                let end_code = self.file_ops.read_end_code(end_code_range);
                 self.binary_search(end_code, search_range, entry_selector - 1)
             }
         }
