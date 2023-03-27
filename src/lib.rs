@@ -1,5 +1,5 @@
 use crate::glyph_reader::GlyphReader;
-use crate::model::{Glyph, GlyphId};
+pub use crate::model::{Glyph, GlyphId};
 use crate::table::cmap_table::Segment;
 use std::fs::File;
 
