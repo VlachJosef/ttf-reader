@@ -34,9 +34,11 @@ impl NameId {
 pub fn read_name(file_ops: &mut FileOps, td: &TableDirectory) {
     file_ops.seek_from_start(td.offset);
 
-    let _format = file_ops.read_u16();
+    let format = file_ops.read_u16();
     let count = file_ops.read_u16();
-    let _string_offset = file_ops.read_u16();
+    let string_offset = file_ops.read_u16();
+
+    assert!(0 == format, "format of name table should be 0");
 
     let name_records: Vec<NameRecord> = (0..count)
         .into_iter()
@@ -62,8 +64,12 @@ pub fn read_name(file_ops: &mut FileOps, td: &TableDirectory) {
 
     name_records.iter().for_each(|nr| {
         if nr.platform_id == PlatformId::Macintosh && nr.language_id == 0 {
+            file_ops.seek_from_start(td.offset);
+            file_ops.seek_from_current((string_offset + nr.offset) as i32);
+
             let str_value = file_ops.read_string(nr.length);
             let info = nr.name_id.info();
+
             println!("{}: {}", info, str_value);
         }
     });

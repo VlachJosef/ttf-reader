@@ -33,6 +33,7 @@ impl GlyphId {
 
 #[derive(Debug)]
 pub enum Glyph {
+    Empty,
     Simple {
         glyph_id: GlyphId,
         x_min: FWord, // Minimum x for coordinate data

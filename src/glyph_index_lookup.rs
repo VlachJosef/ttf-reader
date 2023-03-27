@@ -16,13 +16,41 @@ impl<'a> GlyphIndexLookup<'a> {
         }
     }
 
-    pub fn seek_glyph_id(&mut self, search_range: u16, entry_selector: u16) -> GlyphId {
-        let end_code = self.file_ops.read_end_code(search_range as i32);
+    fn reset_to_end_code_read(&mut self) {
+        // Go from start_code array (+reservedPad) back to end_code array
+        self.file_ops
+            .seek_from_current(-2 - self.seg_count_x2 as i32);
+    }
 
-        if self.char_code > end_code {
-            self.sequential_search()
+    // First segment is not covered by binary search, so it needs to be checked explicitly
+    pub fn check_first_segment(&mut self) -> Option<GlyphId> {
+        let end_code = self.file_ops.read_end_code(0);
+        let start_code = self.read_start_code();
+        if self.char_code <= end_code && self.char_code > start_code {
+            let id_delta = self.read_id_delta();
+            let id_range_offset = self.read_id_range_offset();
+
+            Some(self.compute_glyp_id(start_code, id_delta, id_range_offset))
         } else {
-            self.binary_search(end_code, search_range, entry_selector)
+            self.reset_to_end_code_read();
+            None
+        }
+    }
+
+    pub fn seek_glyph_id(&mut self, search_range: u16, entry_selector: u16) -> GlyphId {
+        let maybe_glyph_id = self.check_first_segment();
+
+        match maybe_glyph_id {
+            Some(glyph_id) => glyph_id,
+            None => {
+                let end_code = self.file_ops.read_end_code(search_range as i32);
+
+                if self.char_code > end_code {
+                    self.sequential_search()
+                } else {
+                    self.binary_search(end_code, search_range, entry_selector)
+                }
+            }
         }
     }
 
@@ -67,9 +95,7 @@ impl<'a> GlyphIndexLookup<'a> {
                     search_range as i32
                 };
 
-                // Go from start_code array (+reservedPad) back to end_code array
-                self.file_ops
-                    .seek_from_current(-2 - self.seg_count_x2 as i32);
+                self.reset_to_end_code_read();
                 let end_code = self.file_ops.read_end_code(end_code_range);
                 self.binary_search(end_code, search_range, entry_selector - 1)
             }

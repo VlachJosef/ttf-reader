@@ -1,12 +1,13 @@
 use crate::contours_reader::ContoursReader;
 use crate::file_ops::FileOps;
 use crate::font_directory::FontDirectory;
-use crate::model::{ArgumentTypes, ComponentData, Glyph};
+use crate::model::{ArgumentTypes, ComponentData, Glyph, GlyphId};
 use crate::table::cmap_table::CMapSubtable;
 use crate::table::head_table::HeadTable;
 use crate::table::loca_table::IndexToLocTable;
 use crate::table::maxp_table::MaximumProfileTable;
 use crate::table::name_table;
+use crate::Segment;
 
 use std::fs::File;
 
@@ -57,42 +58,57 @@ impl GlyphReader {
         }
     }
 
+    pub fn glyph_for_glyph_id(&mut self, glyph_id: GlyphId) -> Glyph {
+        self.read(glyph_id)
+    }
+
+    pub fn cmap_table_segments(&mut self) -> Vec<Segment> {
+        self.cmap_subtable.segments(&mut self.file_ops)
+    }
+
     pub fn read_glyph(&mut self, char_code: u16) -> Glyph {
         let glyph_id = self
             .cmap_subtable
             .find_glyph_id(&mut self.file_ops, char_code);
 
+        self.read(glyph_id)
+    }
+
+    fn read(&mut self, glyph_id: GlyphId) -> Glyph {
         let glyph_offset = self.index_to_loc_table.index_for(&glyph_id);
 
-        self.file_ops
-            .seek_from_start(self.glyf_table_offset + glyph_offset);
-
-        let number_of_contours = self.file_ops.read_i16();
-        let x_min = self.file_ops.read_fword();
-        let y_min = self.file_ops.read_fword();
-        let x_max = self.file_ops.read_fword();
-        let y_max = self.file_ops.read_fword();
-
-        // if >= 0 it is a single glyph; if < 0 the glyph is compound
-        println!("number_of_contours >>> {}", number_of_contours);
-        if number_of_contours >= 0 {
-            let mut contours_reader = ContoursReader::new(&mut self.file_ops);
-            let simple_glyph = contours_reader.read_contours(number_of_contours);
-            let contours = simple_glyph.contours;
-            Glyph::Simple {
-                glyph_id,
-                x_min,
-                x_max,
-                y_min,
-                y_max,
-                contours,
-            }
+        if glyph_offset.is_empty() {
+            Glyph::Empty
         } else {
-            let gc = GlyphComponent::new(&mut self.file_ops);
+            self.file_ops
+                .seek_from_start(self.glyf_table_offset + glyph_offset.offset());
 
-            let components: Vec<ComponentData> = gc.collect();
+            let number_of_contours = self.file_ops.read_i16();
+            let x_min = self.file_ops.read_fword();
+            let y_min = self.file_ops.read_fword();
+            let x_max = self.file_ops.read_fword();
+            let y_max = self.file_ops.read_fword();
 
-            Glyph::Compount { components }
+            // if >= 0 it is a single glyph; if < 0 the glyph is compound
+            if number_of_contours >= 0 {
+                let mut contours_reader = ContoursReader::new(&mut self.file_ops);
+                let simple_glyph = contours_reader.read_contours(number_of_contours);
+                let contours = simple_glyph.contours;
+                Glyph::Simple {
+                    glyph_id,
+                    x_min,
+                    x_max,
+                    y_min,
+                    y_max,
+                    contours,
+                }
+            } else {
+                let gc = GlyphComponent::new(&mut self.file_ops);
+
+                let components: Vec<ComponentData> = gc.collect();
+
+                Glyph::Compount { components }
+            }
         }
     }
 }
