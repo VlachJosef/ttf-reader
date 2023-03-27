@@ -11,9 +11,6 @@ mod glyph_reader;
 mod model;
 mod table;
 
-// https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6.html
-// https://learn.microsoft.com/en-us/typography/opentype/spec/
-
 fn read_file(file_path: &str) -> File {
     File::open(file_path).expect("Should been able to open the file")
 }
