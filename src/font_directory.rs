@@ -10,8 +10,6 @@ impl FontDirectory {
     pub fn from_file(file_ops: &mut FileOps) -> FontDirectory {
         let offset_subtable: OffsetSubtable = OffsetSubtable::from_file(file_ops);
 
-        println!("Read {:?} offset_subtable", offset_subtable);
-
         let table_dictionary: Vec<TableDirectory> = (0..offset_subtable.num_tables)
             .into_iter()
             .map(|_| TableDirectory::from_file(file_ops))
@@ -26,8 +24,7 @@ impl FontDirectory {
     pub fn table_directory(&self, name: &str) -> &TableDirectory {
         let maybe_loca_table: Option<&TableDirectory> =
             self.table_dictionary.iter().find(|td| td.tag == name);
-        let loca_table = maybe_loca_table.expect(&format!("'{name}' table not found"));
-        loca_table
+        maybe_loca_table.expect(&format!("'{name}' table not found"))
     }
 }
 

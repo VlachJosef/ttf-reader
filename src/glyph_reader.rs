@@ -1,21 +1,71 @@
 use crate::contours_reader::ContoursReader;
 use crate::file_ops::FileOps;
-use crate::model::{ArgumentTypes, ComponentData, Glyph, GlyphId};
+use crate::font_directory::FontDirectory;
+use crate::model::{ArgumentTypes, ComponentData, Glyph};
+use crate::table::cmap_table::CMapSubtable;
+use crate::table::head_table::HeadTable;
+use crate::table::loca_table::IndexToLocTable;
+use crate::table::maxp_table::MaximumProfileTable;
+use crate::table::name_table;
 
-pub struct GlyphReader<'a> {
-    file_ops: &'a mut FileOps,
-    offset: u32,
+use std::fs::File;
+
+pub struct GlyphReader {
+    file_ops: FileOps,
+    glyf_table_offset: u32,
+    index_to_loc_table: IndexToLocTable,
+    cmap_subtable: CMapSubtable,
 }
 
-impl<'a> GlyphReader<'a> {
-    pub fn new(file_ops: &mut FileOps, offset: u32, glyph_offset: u32) -> GlyphReader {
-        let offset = offset + glyph_offset;
+impl GlyphReader {
+    pub fn from_file(file: File) -> GlyphReader {
+        let mut file_ops: FileOps = FileOps::from_file(file);
 
-        GlyphReader { file_ops, offset }
+        let font_directory: FontDirectory = FontDirectory::from_file(&mut file_ops);
+
+        let loca_table = font_directory.table_directory("loca");
+        let glyf_table = font_directory.table_directory("glyf");
+        let cmap_table = font_directory.table_directory("cmap");
+        let head_table = font_directory.table_directory("head");
+        let maxp_table = font_directory.table_directory("maxp");
+        let name_table = font_directory.table_directory("name");
+
+        name_table::read_name(&mut file_ops, name_table);
+
+        let head_table = HeadTable::from_file(&mut file_ops, head_table.offset);
+
+        let maximum_profile_table =
+            MaximumProfileTable::from_file(&mut file_ops, maxp_table.offset);
+
+        let index_to_loc_table: IndexToLocTable = IndexToLocTable::mk_index_to_loc_table(
+            &mut file_ops,
+            loca_table.offset,
+            head_table,
+            maximum_profile_table,
+        );
+
+        let cmap_subtable: CMapSubtable =
+            CMapSubtable::find_cmap_subtable(&mut file_ops, cmap_table);
+
+        let glyf_table_offset = glyf_table.offset;
+
+        GlyphReader {
+            file_ops,
+            glyf_table_offset,
+            index_to_loc_table,
+            cmap_subtable,
+        }
     }
 
-    pub fn read_glyph(&mut self, glyph_id: GlyphId) -> Glyph {
-        self.file_ops.seek_from_start(self.offset);
+    pub fn read_glyph(&mut self, char_code: u16) -> Glyph {
+        let glyph_id = self
+            .cmap_subtable
+            .find_glyph_id(&mut self.file_ops, char_code);
+
+        let glyph_offset = self.index_to_loc_table.index_for(&glyph_id);
+
+        self.file_ops
+            .seek_from_start(self.glyf_table_offset + glyph_offset);
 
         let number_of_contours = self.file_ops.read_i16();
         let x_min = self.file_ops.read_fword();
@@ -26,7 +76,7 @@ impl<'a> GlyphReader<'a> {
         // if >= 0 it is a single glyph; if < 0 the glyph is compound
         println!("number_of_contours >>> {}", number_of_contours);
         if number_of_contours >= 0 {
-            let mut contours_reader = ContoursReader::new(self.file_ops);
+            let mut contours_reader = ContoursReader::new(&mut self.file_ops);
             let simple_glyph = contours_reader.read_contours(number_of_contours);
             let contours = simple_glyph.contours;
             Glyph::Simple {
@@ -38,7 +88,7 @@ impl<'a> GlyphReader<'a> {
                 contours,
             }
         } else {
-            let gc = GlyphComponent::new(self.file_ops);
+            let gc = GlyphComponent::new(&mut self.file_ops);
 
             let components: Vec<ComponentData> = gc.collect();
 
