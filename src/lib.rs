@@ -13,7 +13,6 @@ mod table;
 
 // https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6.html
 // https://learn.microsoft.com/en-us/typography/opentype/spec/
-// http://formats.kaitai.io/ttf/ttf.svg
 
 fn read_file(file_path: &str) -> File {
     File::open(file_path).expect("Should been able to open the file")
@@ -92,8 +91,110 @@ mod tests {
     }
 
     #[test]
+    fn golos_text_cmap_segments() {
+        let segments = cmap_table_segments("fonts/GolosText-Regular.ttf");
+
+        let expected_segments = vec![
+            mk_segments!(0, 0, 0, 457, 0),
+            mk_segments!(1, 13, 13, 443, 0),
+            mk_segments!(2, 32, 47, 0, 180),
+            mk_segments!(3, 48, 57, 355, 0),
+            mk_segments!(4, 58, 126, 0, 208),
+            mk_segments!(5, 160, 263, 0, 344),
+            mk_segments!(6, 266, 275, 0, 550),
+            mk_segments!(7, 278, 283, 0, 568),
+            mk_segments!(8, 286, 291, 0, 578),
+            mk_segments!(9, 294, 295, 0, 588),
+            mk_segments!(10, 298, 299, 0, 590),
+            mk_segments!(11, 302, 307, 0, 592),
+            mk_segments!(12, 310, 311, 0, 602),
+            mk_segments!(13, 313, 318, 0, 604),
+            mk_segments!(14, 321, 328, 0, 614),
+            mk_segments!(15, 330, 333, 0, 628),
+            mk_segments!(16, 336, 347, 0, 634),
+            mk_segments!(17, 350, 353, 0, 656),
+            mk_segments!(18, 356, 357, 0, 662),
+            mk_segments!(19, 362, 382, 0, 664),
+            mk_segments!(20, 402, 402, 109, 0),
+            mk_segments!(21, 536, 539, 0, 702),
+            mk_segments!(22, 567, 567, 65131, 0),
+            mk_segments!(23, 700, 700, 65439, 0),
+            mk_segments!(24, 710, 711, 65421, 0),
+            mk_segments!(25, 728, 733, 0, 702),
+            mk_segments!(26, 768, 772, 0, 712),
+            mk_segments!(27, 774, 776, 0, 720),
+            mk_segments!(28, 778, 780, 0, 724),
+            mk_segments!(29, 786, 786, 65324, 0),
+            mk_segments!(30, 806, 808, 65305, 0),
+            mk_segments!(31, 1025, 1036, 0, 724),
+            mk_segments!(32, 1038, 1050, 0, 746),
+            mk_segments!(33, 1051, 1059, 64733, 0),
+            mk_segments!(34, 1060, 1082, 0, 768),
+            mk_segments!(35, 1083, 1091, 64787, 0),
+            mk_segments!(36, 1092, 1103, 0, 810),
+            mk_segments!(37, 1105, 1116, 0, 832),
+            mk_segments!(38, 1118, 1119, 0, 854),
+            mk_segments!(39, 1168, 1181, 0, 856),
+            mk_segments!(40, 1184, 1189, 0, 882),
+            mk_segments!(41, 1194, 1195, 0, 892),
+            mk_segments!(42, 1198, 1203, 0, 894),
+            mk_segments!(43, 1206, 1211, 0, 904),
+            mk_segments!(44, 1216, 1216, 64614, 0),
+            mk_segments!(45, 1219, 1220, 0, 912),
+            mk_segments!(46, 1223, 1224, 0, 914),
+            mk_segments!(47, 1227, 1228, 0, 916),
+            mk_segments!(48, 1231, 1247, 0, 918),
+            mk_segments!(49, 1250, 1259, 0, 950),
+            mk_segments!(50, 1262, 1269, 0, 968),
+            mk_segments!(51, 1272, 1273, 0, 982),
+            mk_segments!(52, 1298, 1299, 0, 984),
+            mk_segments!(53, 7808, 7813, 0, 986),
+            mk_segments!(54, 7838, 7838, 57782, 0),
+            mk_segments!(55, 7922, 7923, 0, 994),
+            mk_segments!(56, 8201, 8201, 57795, 0),
+            mk_segments!(57, 8208, 8212, 0, 994),
+            mk_segments!(58, 8216, 8218, 0, 1002),
+            mk_segments!(59, 8220, 8222, 0, 1006),
+            mk_segments!(60, 8224, 8226, 0, 1010),
+            mk_segments!(61, 8230, 8230, 57772, 0),
+            mk_segments!(62, 8239, 8240, 0, 1012),
+            mk_segments!(63, 8249, 8250, 57794, 0),
+            mk_segments!(64, 8260, 8260, 57719, 0),
+            mk_segments!(65, 8308, 8308, 57682, 0),
+            mk_segments!(66, 8321, 8324, 57662, 0),
+            mk_segments!(67, 8364, 8364, 57697, 0),
+            mk_segments!(68, 8372, 8372, 57694, 0),
+            mk_segments!(69, 8376, 8376, 57691, 0),
+            mk_segments!(70, 8381, 8381, 57687, 0),
+            mk_segments!(71, 8470, 8470, 57590, 0),
+            mk_segments!(72, 8482, 8482, 57572, 0),
+            mk_segments!(73, 8592, 8595, 0, 994),
+            mk_segments!(74, 8598, 8601, 0, 1000),
+            mk_segments!(75, 8710, 8710, 57375, 0),
+            mk_segments!(76, 8722, 8722, 57350, 0),
+            mk_segments!(77, 8725, 8725, 57345, 0),
+            mk_segments!(78, 8730, 8730, 57356, 0),
+            mk_segments!(79, 8776, 8776, 57305, 0),
+            mk_segments!(80, 8804, 8805, 0, 996),
+            mk_segments!(81, 9001, 9002, 57026, 0),
+            mk_segments!(82, 62465, 62465, 3675, 0),
+            mk_segments!(83, 62474, 62474, 3667, 0),
+            mk_segments!(84, 62732, 62733, 3410, 0),
+            mk_segments!(85, 62774, 62775, 3370, 0),
+            mk_segments!(86, 62780, 62781, 3366, 0),
+            mk_segments!(87, 63162, 63164, 2986, 0),
+            mk_segments!(88, 63185, 63185, 2966, 0),
+            mk_segments!(89, 63188, 63188, 2964, 0),
+            mk_segments!(90, 65279, 65279, 712, 0),
+            mk_segments!(91, 65535, 65535, 1, 0),
+        ];
+
+        assert_eq!(segments, expected_segments);
+    }
+
+    #[test]
     fn zeyada_cmap_segments() {
-        let segments = cmap_table_segments("fonts/Zeyada_1");
+        let segments = cmap_table_segments("fonts/Zeyada_1.ttf");
 
         let expected_segments = vec![
             mk_segments!(0, 32, 126, 65507, 0),
@@ -130,13 +231,11 @@ mod tests {
         ];
 
         assert_eq!(segments, expected_segments);
-
-        //panic!("");
     }
 
     #[test]
-    fn all_char_codes() {
-        let mut glyph_reader = mk_glyph_reader("fonts/Zeyada_1");
+    fn all_char_codes_zeyada() {
+        let mut glyph_reader = mk_glyph_reader("fonts/Zeyada_1.ttf");
 
         let char_codes = glyph_reader.all_char_codes();
 
@@ -166,12 +265,11 @@ mod tests {
         ];
 
         assert_eq!(char_codes, expected_char_codes);
-        //panic!("");
     }
 
     #[test]
     fn test_char_code_to_glyph_id() {
-        let mut glyph_reader = mk_glyph_reader("fonts/Zeyada_1");
+        let mut glyph_reader = mk_glyph_reader("fonts/Zeyada_1.ttf");
 
         let char_codes: Vec<u16> = glyph_reader.all_char_codes();
 
@@ -532,7 +630,7 @@ mod tests {
 
     #[test]
     fn notdef_0() {
-        let result = read_glyph_id(GlyphId::new(0), "fonts/Zeyada_1");
+        let result = read_glyph_id(GlyphId::new(0), "fonts/Zeyada_1.ttf");
 
         match result {
             Glyph::Empty { .. } => assert!(true),
@@ -543,7 +641,7 @@ mod tests {
 
     #[test]
     fn glyph_98() {
-        let result = read_glyph_id(GlyphId::new(98), "fonts/Zeyada_1");
+        let result = read_glyph_id(GlyphId::new(98), "fonts/Zeyada_1.ttf");
 
         match result {
             Glyph::Empty { .. } => assert!(true),
@@ -554,7 +652,7 @@ mod tests {
 
     #[test]
     fn notdef_4() {
-        let result = read_glyph_id(GlyphId::new(4), "fonts/Zeyada_1");
+        let result = read_glyph_id(GlyphId::new(4), "fonts/Zeyada_1.ttf");
 
         match result {
             Glyph::Empty { .. } => panic!("Expected Simple glyph"),
@@ -631,15 +729,13 @@ mod tests {
                     )];
 
                 assert_eq!(contours, expected_contours);
-
-                //panic!("");
             }
         }
     }
 
     #[test]
-    fn notdef_monaco() {
-        let result = read_glyph_id(GlyphId::new(0), "fonts/Monaco.ttf");
+    fn notdef_golos_text() {
+        let result = read_glyph_id(GlyphId::new(0), "fonts/GolosText-Regular.ttf");
 
         match result {
             Glyph::Empty { .. } => panic!("Expected Simple glyph"),
@@ -655,38 +751,36 @@ mod tests {
                 contours,
             } => {
                 assert_eq!(glyph_id.id(), 0);
-                assert_eq!(x_min.0, 147);
-                assert_eq!(x_max.0, 877);
+                assert_eq!(x_min.0, 50);
+                assert_eq!(x_max.0, 450);
                 assert_eq!(y_min.0, 0);
-                assert_eq!(y_max.0, 1552);
-                assert_eq!(advance_width, 1229);
-                assert_eq!(left_side_bearing, 147);
+                assert_eq!(y_max.0, 512);
+                assert_eq!(advance_width, 500);
+                assert_eq!(left_side_bearing, 50);
 
                 #[rustfmt::skip]
                 let expected_contours = vec![
                     mk_contour!(
-                        877,    0 - OnCurve,
-                        147,    0 - OnCurve,
-                        147, 1552 - OnCurve,
-                        877, 1552 - OnCurve
+                        58,    8 - OnCurve,
+                        442,   8 - OnCurve,
+                        442, 504 - OnCurve,
+                        58,  504 - OnCurve
                     ),
                     mk_contour!(
-                        727, 1402 - OnCurve,
-                        297, 1402 - OnCurve,
-                        297, 150 - OnCurve,
-                        727, 150 - OnCurve
+                        50, 0 - OnCurve,
+                        50, 512 - OnCurve,
+                        450, 512 - OnCurve,
+                        450, 0 - OnCurve
                     )];
 
                 assert_eq!(contours, expected_contours);
-
-                //panic!("");
             }
         }
     }
 
     #[test]
     fn test_char_exclamation_mark_zeyada() {
-        let result = read_glyph(b'!' as u16, "fonts/Zeyada_1");
+        let result = read_glyph(b'!' as u16, "fonts/Zeyada_1.ttf");
 
         match result {
             Glyph::Empty { .. } => panic!("Expected Simple glyph"),
@@ -769,8 +863,8 @@ mod tests {
     }
 
     #[test]
-    fn test_char_exclamation_mark_monaco() {
-        let result = read_glyph(b'!' as u16, "fonts/Monaco.ttf");
+    fn test_char_exclamation_mark_golos_text() {
+        let result = read_glyph(b'!' as u16, "fonts/GolosText-Regular.ttf");
 
         match result {
             Glyph::Empty { .. } => panic!("Expected Simple glyph"),
@@ -785,47 +879,47 @@ mod tests {
                 left_side_bearing,
                 contours,
             } => {
-                assert_eq!(glyph_id.id(), 4);
-                assert_eq!(x_min.0, 471);
-                assert_eq!(x_max.0, 758);
-                assert_eq!(y_min.0, -47);
-                assert_eq!(y_max.0, 1552);
-                assert_eq!(advance_width, 1229);
-                assert_eq!(left_side_bearing, 471);
+                assert_eq!(glyph_id.id(), 467);
+                assert_eq!(x_min.0, 80);
+                assert_eq!(x_max.0, 220);
+                assert_eq!(y_min.0, -10);
+                assert_eq!(y_max.0, 700);
+                assert_eq!(advance_width, 300);
+                assert_eq!(left_side_bearing, 80);
 
                 #[rustfmt::skip]
                 let expected_contours = vec![
                     mk_contour!(
-                        529,  442 - OnCurve,
-                        483, 1552 - OnCurve,
-                        731, 1552 - OnCurve,
-                        684,  442 - OnCurve
+                        106, 220 - OnCurve,
+                        106, 700 - OnCurve,
+                        194, 700 - OnCurve,
+                        194, 220 - OnCurve
                     ),
                     mk_contour!(
-                        615, -47 - OnCurve,
-                        556, -47 - Control,
-                        471,  38 - Control,
-                        471,  97 - OnCurve,
-                        471, 156 - Control,
-                        556, 240 - Control,
-                        615, 240 - OnCurve,
-                        673, 240 - Control,
-                        758, 157 - Control,
-                        758,  97 - OnCurve,
-                        758,  37 - Control,
-                        672, -47 - Control
+                        150, -10 - OnCurve,
+                        131, -10 - Control,
+                        99,    9 - Control,
+                        80,   41 - Control,
+                        80,   60 - OnCurve,
+                        80,   90 - Control,
+                        121, 130 - Control,
+                        150, 130 - OnCurve,
+                        179, 130 - Control,
+                        220,  90 - Control,
+                        220,  60 - OnCurve,
+                        220,  41 - Control,
+                        201,   9 - Control,
+                        170, -10 - Control
                     )];
 
                 assert_eq!(contours, expected_contours);
             }
         }
-
-        //panic!("");
     }
 
     #[test]
-    fn test_monaco_char_a() {
-        let result = read_glyph(b'a' as u16, "fonts/Monaco.ttf");
+    fn test_char_a_golos_text() {
+        let result = read_glyph(b'a' as u16, "fonts/GolosText-Regular.ttf");
 
         match result {
             Glyph::Empty { .. } => panic!("Expected Empty glyph"),
@@ -840,52 +934,66 @@ mod tests {
                 left_side_bearing,
                 contours,
             } => {
-                assert_eq!(glyph_id.id(), 68);
-                assert_eq!(x_min.0, 102);
-                assert_eq!(x_max.0, 1118);
-                assert_eq!(y_min.0, -31);
-                assert_eq!(y_max.0, 1133);
-                assert_eq!(advance_width, 1229);
-                assert_eq!(left_side_bearing, 102);
+                assert_eq!(glyph_id.id(), 114);
+                assert_eq!(x_min.0, 50);
+                assert_eq!(x_max.0, 495);
+                assert_eq!(y_min.0, -10);
+                assert_eq!(y_max.0, 540);
+                assert_eq!(advance_width, 565);
+                assert_eq!(left_side_bearing, 50);
 
                 #[rustfmt::skip]
                 let expected_contours = vec![
                     mk_contour!(
-                        889,  251 - OnCurve,
-                        804,  111 - Control,
-                        565,  -31 - Control,
-                        465,  -31 - OnCurve,
-                        325,  -31 - Control,
-                        102,  211 - Control,
-                        102,  457 - OnCurve,
-                        102,  651 - Control,
-                        250,  956 - Control,
-                        498, 1133 - Control,
-                        681, 1133 - OnCurve,
-                        734, 1133 - Control,
-                        841, 1122 - OnCurve,
-                        857, 1120 - Control,
-                        889, 1117 - OnCurve,
-                        1076, 1117 - OnCurve,
-                        1076,  328 - OnCurve,
-                        1076,  126 - Control,
-                        1118,    0 - OnCurve,
-                        924,    0 - OnCurve,
-                        902,   92 - Control
+                        231, -10 - OnCurve,
+                        173, -10 - Control,
+                        92,   33 - Control,
+                        50,  108 - Control,
+                        50,  155 - OnCurve,
+                        50,  234 - Control,
+                        143, 304 - Control,
+                        230, 304 - OnCurve,
+                        402, 304 - OnCurve,
+                        402, 340 - OnCurve,
+                        402, 408 - Control,
+                        341, 460 - Control,
+                        280, 460 - OnCurve,
+                        223, 460 - Control,
+                        171, 417 - Control,
+                        168, 390 - OnCurve,
+                        80,  390 - OnCurve,
+                        83,  433 - Control,
+                        135, 500 - Control,
+                        225, 540 - Control,
+                        285, 540 - OnCurve,
+                        348, 540 - Control,
+                        440, 501 - Control,
+                        490, 418 - Control,
+                        490, 350 - OnCurve,
+                        490, 135 - OnCurve,
+                        490,  93 - Control,
+                        491,  30 - Control,
+                        495,   0 - OnCurve,
+                        418,   0 - OnCurve,
+                        415,  23 - Control,
+                        413,  64 - Control,
+                        413,  90 - OnCurve,
+                        392,  48 - Control,
+                        298, -10 - Control
                     ),
                     mk_contour!(
-                        889, 472 - OnCurve,
-                        889, 951 - OnCurve,
-                        790, 977 - Control,
-                        705, 977 - OnCurve,
-                        533, 977 - Control,
-                        304, 711 - Control,
-                        304, 482 - OnCurve,
-                        304, 316 - Control,
-                        429, 147 - Control,
-                        509, 147 - OnCurve,
-                        596, 147 - Control,
-                        806, 323 - Control
+                        250,  70 - OnCurve,
+                        292,  70 - Control,
+                        361, 100 - Control,
+                        402, 158 - Control,
+                        402, 200 - OnCurve,
+                        402, 236 - OnCurve,
+                        245, 236 - OnCurve,
+                        196, 236 - Control,
+                        140, 197 - Control,
+                        140, 155 - OnCurve,
+                        140, 118 - Control,
+                        193,  70 - Control
                     )];
                 assert_eq!(contours, expected_contours);
             }
@@ -893,8 +1001,8 @@ mod tests {
     }
 
     #[test]
-    fn test_char_aacute() {
-        let result = read_glyph('á' as u16, "fonts/Monaco.ttf");
+    fn test_char_aacute_golos_text() {
+        let result = read_glyph('á' as u16, "fonts/GolosText-Regular.ttf");
 
         match result {
             Glyph::Empty { .. } => panic!("Expected Compount glyph"),
@@ -908,139 +1016,33 @@ mod tests {
                 left_side_bearing,
                 components,
             } => {
-                assert_eq!(glyph_id.id(), 105);
-                assert_eq!(x_min.0, 102);
-                assert_eq!(x_max.0, 1118);
-                assert_eq!(y_min.0, -31);
-                assert_eq!(y_max.0, 1614);
-                assert_eq!(advance_width, 1229);
-                assert_eq!(left_side_bearing, 102);
+                assert_eq!(glyph_id.id(), 115);
+                assert_eq!(x_min.0, 50);
+                assert_eq!(x_max.0, 495);
+                assert_eq!(y_min.0, -10);
+                assert_eq!(y_max.0, 740);
+                assert_eq!(advance_width, 565);
+                assert_eq!(left_side_bearing, 50);
                 assert_eq!(components.len(), 2);
 
                 let c1 = &components[0];
                 let c2 = &components[1];
 
-                assert_eq!(c1.glyph_index, 68);
+                assert_eq!(c1.glyph_index, 114);
                 assert_eq!(c1.a, 1);
                 assert_eq!(c1.b, 0);
                 assert_eq!(c1.c, 0);
                 assert_eq!(c1.d, 1);
                 assert_eq!(c1.argument_types, ArgumentTypes::XYValue8(0, 0));
-                assert_eq!(c2.glyph_index, 141);
+                assert_eq!(c2.glyph_index, 565);
                 assert_eq!(c2.a, 1);
                 assert_eq!(c2.b, 0);
                 assert_eq!(c2.c, 0);
                 assert_eq!(c2.d, 1);
-                assert_eq!(c2.argument_types, ArgumentTypes::XYValue16(159, 0));
+                assert_eq!(c2.argument_types, ArgumentTypes::XYValue16(230, 0));
             }
 
             Glyph::Simple { .. } => panic!("Expected Compount glyph"),
-        }
-    }
-
-    #[test]
-    fn test_char_medium_shade() {
-        let result = read_glyph('▒' as u16, "fonts/Monaco.ttf");
-
-        match result {
-            Glyph::Empty { .. } => panic!("expected Simple glyph"),
-            Glyph::Compount { .. } => panic!("Expected Simpe glyph"),
-            Glyph::Simple {
-                glyph_id,
-                x_min,
-                x_max,
-                y_min,
-                y_max,
-                advance_width,
-                left_side_bearing,
-                contours,
-            } => {
-                assert_eq!(glyph_id.id(), 1676);
-                assert_eq!(x_min.0, 1);
-                assert_eq!(x_max.0, 1024);
-                assert_eq!(y_min.0, -202);
-                assert_eq!(y_max.0, 1555);
-                assert_eq!(advance_width, 1024);
-                assert_eq!(left_side_bearing, 1);
-
-                #[rustfmt::skip]
-                let expected_contours = vec![
-                    mk_contour!(
-                        773, 1261 - OnCurve,
-                        520, 1262 - OnCurve,
-                        521, 1553 - OnCurve,
-                        772, 1555 - OnCurve
-                    ),
-                    mk_contour!(
-                        252, 1262 - OnCurve,
-                        1, 1262 - OnCurve,
-                        1, 1555 - OnCurve,
-                        254, 1553 - OnCurve
-                    ),
-                    mk_contour!(
-                        515, 969 - OnCurve,
-                        264, 969 - OnCurve,
-                        264, 1262 - OnCurve,
-                        516, 1261 - OnCurve
-                    ),
-                    mk_contour!(
-                        1024, 968 - OnCurve,
-                        771, 969 - OnCurve,
-                        772, 1261 - OnCurve,
-                        1022, 1262 - OnCurve
-                    ),
-                    mk_contour!(
-                        773, 676 - OnCurve,
-                        520, 677 - OnCurve,
-                        521, 968 - OnCurve,
-                        772, 969 - OnCurve
-                    ),
-                    mk_contour!(
-                        252, 677 - OnCurve,
-                        1, 677 - OnCurve,
-                        1, 969 - OnCurve,
-                        254, 968 - OnCurve
-                    ),
-                    mk_contour!(
-                        515, 385 - OnCurve,
-                        264, 385 - OnCurve,
-                        264, 677 - OnCurve,
-                        516, 676 - OnCurve
-                    ),
-                    mk_contour!(
-                        1024, 384 - OnCurve,
-                        771, 385 - OnCurve,
-                        772, 676 - OnCurve,
-                        1022, 677 - OnCurve
-                    ),
-                    mk_contour!(
-                        773, 91 - OnCurve,
-                        520, 92 - OnCurve,
-                        521, 384 - OnCurve,
-                        772, 385 - OnCurve
-                    ),
-                    mk_contour!(
-                        252, 92 - OnCurve,
-                        1, 92 - OnCurve,
-                        1, 385 - OnCurve,
-                        254, 384 - OnCurve
-                    ),
-                    mk_contour!(
-                        515, -200 - OnCurve,
-                        264, -200 - OnCurve,
-                        264, 92 - OnCurve,
-                        516, 91 - OnCurve
-                    ),
-                    mk_contour!(
-                        1024, -202 - OnCurve,
-                        771, -200 - OnCurve,
-                        772, 91 - OnCurve,
-                        1022, 92 - OnCurve
-                    )
-                ];
-
-                assert_eq!(contours, expected_contours);
-            }
         }
     }
 }
