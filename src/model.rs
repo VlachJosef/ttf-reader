@@ -19,7 +19,7 @@ pub struct Fixed {
     pub minor: u16,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct GlyphId(u16);
 
 impl GlyphId {
@@ -36,7 +36,9 @@ impl GlyphId {
 
 #[derive(Debug)]
 pub enum Glyph {
-    Empty,
+    Empty {
+        glyph_id: GlyphId,
+    },
     Simple {
         glyph_id: GlyphId,
         x_min: FWord, // Minimum x for coordinate data
@@ -46,6 +48,7 @@ pub enum Glyph {
         contours: Vec<Contour>,
     },
     Compount {
+        glyph_id: GlyphId,
         components: Vec<ComponentData>,
     },
 }

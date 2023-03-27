@@ -35,7 +35,7 @@ impl GlyphReader {
         let hhea_table = font_directory.table_directory("hhea");
         let htmx_table = font_directory.table_directory("hmtx");
 
-        name_table::read_name(&mut file_ops, name_table);
+        //name_table::read_name(&mut file_ops, name_table);
 
         let head_table = HeadTable::from_file(&mut file_ops, head_table.offset);
 
@@ -79,19 +79,32 @@ impl GlyphReader {
         self.cmap_subtable.segments(&mut self.file_ops)
     }
 
+    pub fn char_code_to_glyph_id(&mut self, char_code: u16) -> GlyphId {
+        self.cmap_subtable
+            .find_glyph_id(&mut self.file_ops, char_code)
+    }
+
     pub fn read_glyph(&mut self, char_code: u16) -> Glyph {
-        let glyph_id = self
-            .cmap_subtable
-            .find_glyph_id(&mut self.file_ops, char_code);
+        let glyph_id = self.char_code_to_glyph_id(char_code);
+
+        println!("c_c {} g_id {:?}", char_code, glyph_id);
 
         self.read(glyph_id)
+    }
+
+    pub fn all_char_codes(&mut self) -> Vec<u16> {
+        let segments: Vec<Segment> = self.cmap_table_segments();
+        segments
+            .iter()
+            .flat_map(|segment| (segment.start_code..=segment.end_code).collect::<Vec<u16>>())
+            .collect::<Vec<u16>>()
     }
 
     fn read(&mut self, glyph_id: GlyphId) -> Glyph {
         let glyph_offset = self.index_to_loc_table.index_for(&glyph_id);
 
         if glyph_offset.is_empty() {
-            Glyph::Empty
+            Glyph::Empty { glyph_id }
         } else {
             self.file_ops
                 .seek_from_start(self.glyf_table_offset + glyph_offset.offset());
@@ -120,7 +133,10 @@ impl GlyphReader {
 
                 let components: Vec<ComponentData> = gc.collect();
 
-                Glyph::Compount { components }
+                Glyph::Compount {
+                    glyph_id,
+                    components,
+                }
             }
         }
     }

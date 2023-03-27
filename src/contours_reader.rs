@@ -156,7 +156,6 @@ struct ContourFlags {
 impl ContourFlags {
     fn mk_contour_flags(file_ops: &mut FileOps, end_pts_of_contours: Vec<u16>) -> ContourFlags {
         let last = end_pts_of_contours.last().unwrap();
-        println!("last                {:?}", last);
 
         let contour_flags_total: Vec<ControlPointsFlags> =
             Self::_mk_contour_flags(file_ops, *last + 1);
