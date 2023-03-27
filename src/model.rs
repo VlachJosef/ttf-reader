@@ -32,8 +32,8 @@ impl GlyphId {
 }
 
 #[derive(Debug)]
-pub enum GlyphType {
-    SimpleGlyph {
+pub enum Glyph {
+    Simple {
         glyph_id: GlyphId,
         x_min: FWord, // Minimum x for coordinate data
         y_min: FWord, // Minimum y for coordinate data
@@ -41,7 +41,7 @@ pub enum GlyphType {
         y_max: FWord, // Maximum y for coordinate data
         contours: Vec<Contour>,
     },
-    CompountGlyph {
+    Compount {
         components: Vec<ComponentData>,
     },
 }

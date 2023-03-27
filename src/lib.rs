@@ -2,7 +2,7 @@ use crate::file_ops::FileOps;
 use crate::font_directory::FontDirectory;
 use crate::glyph_index_lookup::GlyphIndexLookup;
 use crate::glyph_reader::GlyphReader;
-use crate::model::{FWord, Fixed, GlyphId, GlyphType};
+use crate::model::{FWord, Fixed, Glyph, GlyphId};
 use std::fs::File;
 
 mod contours_reader;
@@ -238,7 +238,7 @@ impl CMapTable {
     }
 }
 
-pub fn read_font_file(char_code: u16) -> GlyphType {
+pub fn read_font_file(char_code: u16) -> Glyph {
     let file_path = "fonts/Monaco.ttf";
 
     let file: File = File::open(file_path).expect("Should been able to open the file");
@@ -307,8 +307,8 @@ mod tests {
         let result = read_font_file(b'!' as u16);
 
         match result {
-            GlyphType::CompountGlyph { .. } => panic!("Unexpected glyph type"),
-            GlyphType::SimpleGlyph {
+            Glyph::Compount { .. } => panic!("Unexpected glyph type"),
+            Glyph::Simple {
                 glyph_id,
                 x_min,
                 x_max,
@@ -357,8 +357,8 @@ mod tests {
         let result = read_font_file(b'a' as u16);
 
         match result {
-            GlyphType::CompountGlyph { .. } => panic!("Unexpected glyph type"),
-            GlyphType::SimpleGlyph {
+            Glyph::Compount { .. } => panic!("Unexpected glyph type"),
+            Glyph::Simple {
                 glyph_id,
                 x_min,
                 x_max,
@@ -421,7 +421,7 @@ mod tests {
         let result = read_font_file('á' as u16);
 
         match result {
-            GlyphType::CompountGlyph { components } => {
+            Glyph::Compount { components } => {
                 assert_eq!(components.len(), 2);
 
                 let c1 = &components[0];
@@ -441,7 +441,7 @@ mod tests {
                 assert_eq!(c2.argument_types, ArgumentTypes::XYValue16(159, 0));
             }
 
-            GlyphType::SimpleGlyph { .. } => panic!("Unexpected glyph type"),
+            Glyph::Simple { .. } => panic!("Unexpected glyph type"),
         }
     }
 
@@ -450,8 +450,8 @@ mod tests {
         let result = read_font_file('▒' as u16);
 
         match result {
-            GlyphType::CompountGlyph { .. } => panic!("Unexpected glyph type"),
-            GlyphType::SimpleGlyph {
+            Glyph::Compount { .. } => panic!("Unexpected glyph type"),
+            Glyph::Simple {
                 glyph_id,
                 x_min,
                 x_max,

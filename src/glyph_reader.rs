@@ -1,6 +1,6 @@
 use crate::contours_reader::ContoursReader;
 use crate::file_ops::FileOps;
-use crate::model::{ArgumentTypes, ComponentData, GlyphId, GlyphType};
+use crate::model::{ArgumentTypes, ComponentData, Glyph, GlyphId};
 
 pub struct GlyphReader<'a> {
     file_ops: &'a mut FileOps,
@@ -14,7 +14,7 @@ impl<'a> GlyphReader<'a> {
         GlyphReader { file_ops, offset }
     }
 
-    pub fn read_glyph(&mut self, glyph_id: GlyphId) -> GlyphType {
+    pub fn read_glyph(&mut self, glyph_id: GlyphId) -> Glyph {
         self.file_ops.seek_from_start(self.offset);
 
         let number_of_contours = self.file_ops.read_i16();
@@ -29,7 +29,7 @@ impl<'a> GlyphReader<'a> {
             let mut contours_reader = ContoursReader::new(self.file_ops);
             let simple_glyph = contours_reader.read_contours(number_of_contours);
             let contours = simple_glyph.contours;
-            GlyphType::SimpleGlyph {
+            Glyph::Simple {
                 glyph_id,
                 x_min,
                 x_max,
@@ -42,7 +42,7 @@ impl<'a> GlyphReader<'a> {
 
             let components: Vec<ComponentData> = gc.collect();
 
-            GlyphType::CompountGlyph { components }
+            Glyph::Compount { components }
         }
     }
 }
