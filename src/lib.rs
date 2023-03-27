@@ -27,24 +27,23 @@ struct MaximumProfileTable {
 }
 
 impl MaximumProfileTable {
-    fn from_file(mut file: &File, offset: u64) -> MaximumProfileTable {
-        file.seek(SeekFrom::Start(offset))
-            .expect("Expected be able to seek");
-        let version: Fixed = read_fixed(file);
-        let num_glyphs: u16 = read_u16(file);
-        let max_points: u16 = read_u16(file);
-        let max_contours: u16 = read_u16(file);
-        let max_component_points: u16 = read_u16(file);
-        let max_component_contours: u16 = read_u16(file);
-        let max_zones: u16 = read_u16(file);
-        let max_twilight_points: u16 = read_u16(file);
-        let max_storage: u16 = read_u16(file);
-        let max_function_defs: u16 = read_u16(file);
-        let max_instruction_defs: u16 = read_u16(file);
-        let max_stack_elements: u16 = read_u16(file);
-        let max_size_of_instructions: u16 = read_u16(file);
-        let max_component_elements: u16 = read_u16(file);
-        let max_component_depth: u16 = read_u16(file);
+    fn from_file(file_ops: &mut FileOps, offset: u64) -> MaximumProfileTable {
+        file_ops.seek(SeekFrom::Start(offset));
+        let version: Fixed = file_ops.read_fixed();
+        let num_glyphs: u16 = file_ops.read_u16();
+        let max_points: u16 = file_ops.read_u16();
+        let max_contours: u16 = file_ops.read_u16();
+        let max_component_points: u16 = file_ops.read_u16();
+        let max_component_contours: u16 = file_ops.read_u16();
+        let max_zones: u16 = file_ops.read_u16();
+        let max_twilight_points: u16 = file_ops.read_u16();
+        let max_storage: u16 = file_ops.read_u16();
+        let max_function_defs: u16 = file_ops.read_u16();
+        let max_instruction_defs: u16 = file_ops.read_u16();
+        let max_stack_elements: u16 = file_ops.read_u16();
+        let max_size_of_instructions: u16 = file_ops.read_u16();
+        let max_component_elements: u16 = file_ops.read_u16();
+        let max_component_depth: u16 = file_ops.read_u16();
         MaximumProfileTable {
             version,
             num_glyphs,
@@ -76,12 +75,12 @@ struct OffsetSubtable {
 }
 
 impl OffsetSubtable {
-    fn from_file(file: &File) -> OffsetSubtable {
-        let scaler_type = read_u32(file);
-        let num_tables = read_u16(file);
-        let search_range = read_u16(file);
-        let entry_selector = read_u16(file);
-        let range_shift = read_u16(file);
+    fn from_file(file_ops: &mut FileOps) -> OffsetSubtable {
+        let scaler_type = file_ops.read_u32();
+        let num_tables = file_ops.read_u16();
+        let search_range = file_ops.read_u16();
+        let entry_selector = file_ops.read_u16();
+        let range_shift = file_ops.read_u16();
 
         OffsetSubtable {
             scaler_type,
@@ -103,11 +102,11 @@ struct TableDirectory {
 }
 
 impl TableDirectory {
-    fn from_file(file: &File) -> TableDirectory {
-        let tag: String = read_table_name(file);
-        let checksum = read_u32(file);
-        let offset = read_u32(file);
-        let length = read_u32(file);
+    fn from_file(file_ops: &mut FileOps) -> TableDirectory {
+        let tag: String = file_ops.read_table_name();
+        let checksum = file_ops.read_u32();
+        let offset = file_ops.read_u32();
+        let length = file_ops.read_u32();
 
         TableDirectory {
             tag,
@@ -129,17 +128,16 @@ impl IndexToLocTable {
     }
 
     fn mk_index_to_loc_table(
-        mut file: &File,
+        file_ops: &mut FileOps,
         offset: u64,
         head_table: HeadTable,
         maximum_profile_table: MaximumProfileTable,
     ) -> IndexToLocTable {
-        file.seek(SeekFrom::Start(offset))
-            .expect("Expected be able to seek");
+        file_ops.seek(SeekFrom::Start(offset));
         let data: Vec<u32> = match head_table.index_to_loc_format {
             0 => todo!("                       SHORT"),
             1 => (0..maximum_profile_table.num_glyphs)
-                .map(|_| read_u32(file))
+                .map(|_| file_ops.read_u32())
                 .collect(),
             _ => unreachable!("Only 0 and 1 is supported per specification"),
         };
@@ -167,18 +165,15 @@ pub struct ComponentData {
     argument_types: ArgumentTypes, // encapsulates e, f
 }
 
-#[derive(Debug)]
-struct GlyphTable {}
-
 struct GlyphComponent<'a> {
-    file: &'a File,
+    file_ops: &'a mut FileOps,
     has_more: bool,
 }
 
 impl<'a> GlyphComponent<'a> {
-    fn new(file: &'a File) -> GlyphComponent<'a> {
+    fn new(file_ops: &'a mut FileOps) -> GlyphComponent<'a> {
         GlyphComponent {
-            file,
+            file_ops,
             has_more: true,
         }
     }
@@ -189,44 +184,44 @@ impl<'a> Iterator for GlyphComponent<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.has_more {
-            let file = &self.file;
-            let component_flag = ComponentFlag::from_file(file);
+            //let file_ops = &self.file_ops;
+            let component_flag = ComponentFlag::from_file(self.file_ops);
             //component_flag.pretty_print();
-            let glyph_index = read_u16(file);
+            let glyph_index = self.file_ops.read_u16();
             let argument_types = if component_flag.arg1_and_arg2_are_words() {
                 if component_flag.args_are_xy_values() {
-                    let arg1 = read_i16(file);
-                    let arg2 = read_i16(file);
+                    let arg1 = self.file_ops.read_i16();
+                    let arg2 = self.file_ops.read_i16();
                     ArgumentTypes::XYValue16(arg1, arg2)
                 } else {
-                    let arg1 = read_u16(file);
-                    let arg2 = read_u16(file);
+                    let arg1 = self.file_ops.read_u16();
+                    let arg2 = self.file_ops.read_u16();
                     ArgumentTypes::Point16(arg1, arg2)
                 }
             } else {
                 if component_flag.args_are_xy_values() {
-                    let arg1 = read_i8(file);
-                    let arg2 = read_i8(file);
+                    let arg1 = self.file_ops.read_i8();
+                    let arg2 = self.file_ops.read_i8();
                     ArgumentTypes::XYValue8(arg1, arg2)
                 } else {
-                    let arg1 = read_u8(file);
-                    let arg2 = read_u8(file);
+                    let arg1 = self.file_ops.read_u8();
+                    let arg2 = self.file_ops.read_u8();
                     ArgumentTypes::Point8(arg1, arg2)
                 }
             };
 
             let (a, b, c, d) = if component_flag.we_have_a_scale() {
-                let scale = read_i16(file);
+                let scale = self.file_ops.read_i16();
                 (scale, 0, 0, scale)
             } else if component_flag.we_have_an_x_and_y_scale() {
-                let x_scale = read_i16(file);
-                let y_scale = read_i16(file);
+                let x_scale = self.file_ops.read_i16();
+                let y_scale = self.file_ops.read_i16();
                 (x_scale, 0, 0, y_scale)
             } else if component_flag.we_have_a_two_by_two() {
-                let x_scale = read_i16(file);
-                let scale_01 = read_i16(file);
-                let scale_10 = read_i16(file);
-                let y_scale = read_i16(file);
+                let x_scale = self.file_ops.read_i16();
+                let scale_01 = self.file_ops.read_i16();
+                let scale_10 = self.file_ops.read_i16();
+                let y_scale = self.file_ops.read_i16();
                 (x_scale, scale_01, scale_10, y_scale)
             } else {
                 (1, 0, 0, 1)
@@ -250,18 +245,21 @@ impl<'a> Iterator for GlyphComponent<'a> {
     }
 }
 
+#[derive(Debug)]
+struct GlyphTable {}
+
 impl GlyphTable {
-    fn read_glyph(file: &File, glyph_id: GlyphId) -> GlyphData {
-        let number_of_contours = read_i16(file);
-        let x_min = read_fword(file);
-        let y_min = read_fword(file);
-        let x_max = read_fword(file);
-        let y_max = read_fword(file);
+    fn read_glyph(file_ops: &mut FileOps, glyph_id: GlyphId) -> GlyphData {
+        let number_of_contours = file_ops.read_i16();
+        let x_min = file_ops.read_fword();
+        let y_min = file_ops.read_fword();
+        let x_max = file_ops.read_fword();
+        let y_max = file_ops.read_fword();
 
         // if >= 0 it is a single glyph; if < 0 the glyph is compound
         println!("number_of_contours >>> {}", number_of_contours);
         if number_of_contours >= 0 {
-            let simple_glyph = SimpleGlyph::mk_simple_glyph(file, number_of_contours);
+            let simple_glyph = Contours::read_contours(file_ops, number_of_contours);
             let contours = simple_glyph.contours;
             GlyphData::SimpleGlyph {
                 glyph_id,
@@ -272,37 +270,24 @@ impl GlyphTable {
                 contours,
             }
         } else {
-            let gc = GlyphComponent::new(file);
+            let gc = GlyphComponent::new(file_ops);
 
             let aaa: Vec<ComponentData> = gc.collect();
 
             GlyphData::CompountGlyph { components: aaa }
-
-            //println!("-------------------- a: {:?}", aaa);
-
-            //todo!("Implement compount glyph ")
         }
     }
 
     fn mk_glyph_table(
-        mut file: &File,
+        file_ops: &mut FileOps,
         offset: u64,
         glyph_offset: u32,
         glyph_id: GlyphId,
     ) -> GlyphData {
-        file.seek(SeekFrom::Start(offset + glyph_offset as u64))
-            .expect("Expected be able to seek");
+        file_ops.seek(SeekFrom::Start(offset + glyph_offset as u64));
 
-        Self::read_glyph(file, glyph_id)
+        Self::read_glyph(file_ops, glyph_id)
     }
-}
-
-#[allow(unused)]
-#[derive(Debug)]
-struct SimpleGlyph {
-    instruction_length: u16,
-    instructions: Vec<u8>,
-    contours: Vec<Contour>,
 }
 
 #[allow(unused)]
@@ -312,24 +297,28 @@ struct ContourFlags {
 }
 
 impl ContourFlags {
-    fn mk_contour_flags(file: &File, end_pts_of_contours: Vec<u16>) -> ContourFlags {
+    fn mk_contour_flags(file_ops: &mut FileOps, end_pts_of_contours: Vec<u16>) -> ContourFlags {
         let last = end_pts_of_contours.last().unwrap();
         println!("last                {:?}", last);
 
-        let contour_flags_total: Vec<ControlPointsFlags> = Self::_mk_contour_flags(file, *last + 1);
+        let contour_flags_total: Vec<ControlPointsFlags> =
+            Self::_mk_contour_flags(file_ops, *last + 1);
 
         ContourFlags {
             contour_flags: contour_flags_total,
         }
     }
-    fn _mk_contour_flags(file: &File, mut number_of_points: u16) -> Vec<ControlPointsFlags> {
+    fn _mk_contour_flags(
+        file_ops: &mut FileOps,
+        mut number_of_points: u16,
+    ) -> Vec<ControlPointsFlags> {
         let mut contour_flags: Vec<ControlPointsFlags> =
             Vec::with_capacity((number_of_points + 1) as usize);
         while number_of_points > 0 {
-            let control_points = ControlPointsFlags::from_file(file);
+            let control_points = ControlPointsFlags::from_file(file_ops);
             if control_points.repeat() {
                 // If repeat is set, the next byte specifies the number of additional times this set of flags is to be repeated.
-                let mut repeat_times = read_u8(file);
+                let mut repeat_times = file_ops.read_u8();
 
                 while repeat_times > 0 {
                     contour_flags.push(control_points);
@@ -364,8 +353,8 @@ impl PointType {
 struct ComponentFlag(u16);
 
 impl ComponentFlag {
-    fn from_file(file: &File) -> ComponentFlag {
-        ComponentFlag(read_u16(file))
+    fn from_file(file_ops: &mut FileOps) -> ComponentFlag {
+        ComponentFlag(file_ops.read_u16())
     }
 
     #[allow(unused)]
@@ -460,8 +449,8 @@ impl ComponentFlag {
 struct ControlPointsFlags(u8);
 
 impl ControlPointsFlags {
-    fn from_file(file: &File) -> ControlPointsFlags {
-        ControlPointsFlags(read_u8(file))
+    fn from_file(file_ops: &mut FileOps) -> ControlPointsFlags {
+        ControlPointsFlags(file_ops.read_u8())
     }
 
     fn is_set(&self, bit: u8) -> bool {
@@ -537,9 +526,14 @@ impl Point {
     }
 }
 
-impl SimpleGlyph {
+#[derive(Debug)]
+struct Contours {
+    contours: Vec<Contour>,
+}
+
+impl Contours {
     fn read_coordinates(
-        file: &File,
+        file_ops: &mut FileOps,
         flags: &ContourFlags,
         is_short_vector: fn(&ControlPointsFlags) -> bool,
         is_same: fn(&ControlPointsFlags) -> bool,
@@ -549,7 +543,7 @@ impl SimpleGlyph {
 
         flags.contour_flags.iter().for_each(|contour_flag| {
             let coordinate = if is_short_vector(contour_flag) {
-                let coor = read_u8(file) as i16;
+                let coor = file_ops.read_u8() as i16;
                 if is_same(contour_flag) {
                     coor
                 } else {
@@ -559,7 +553,7 @@ impl SimpleGlyph {
                 if is_same(contour_flag) {
                     0
                 } else {
-                    read_i16(file)
+                    file_ops.read_i16()
                 }
             };
             let coordinate = last_elem + coordinate;
@@ -570,33 +564,30 @@ impl SimpleGlyph {
         coordinates
     }
 
-    fn mk_simple_glyph(file: &File, n: i16) -> SimpleGlyph {
+    fn read_contours(file_ops: &mut FileOps, n: i16) -> Contours {
         let mut end_pts_of_contours: Vec<u16> =
-            (0..n).into_iter().map(|_| read_u16(file)).collect();
-        let instruction_length: u16 = read_u16(file);
+            (0..n).into_iter().map(|_| file_ops.read_u16()).collect();
+        let instruction_length: u16 = file_ops.read_u16();
 
         println!("SOURCE end_pts_of_contours {:?}", end_pts_of_contours);
 
-        let instructions = (0..instruction_length)
-            .into_iter()
-            .map(|_| read_u8(file))
-            .collect();
+        file_ops.seek(SeekFrom::Current(instruction_length as i64)); // Skip instructions
 
         end_pts_of_contours.insert(0, 0);
 
         // The number of points is determined by the last entry in the end_pts_of_contours array.
-
-        let flags: ContourFlags = ContourFlags::mk_contour_flags(file, end_pts_of_contours.clone());
+        let flags: ContourFlags =
+            ContourFlags::mk_contour_flags(file_ops, end_pts_of_contours.clone());
         println!("HERE flags {:?}", flags);
 
-        let x_coordinates = SimpleGlyph::read_coordinates(
-            file,
+        let x_coordinates = Contours::read_coordinates(
+            file_ops,
             &flags,
             |cf| cf.x_short_vector(),
             |cf| cf.x_is_same(),
         );
-        let y_coordinates = SimpleGlyph::read_coordinates(
-            file,
+        let y_coordinates = Contours::read_coordinates(
+            file_ops,
             &flags,
             |cf| cf.y_short_vector(),
             |cf| cf.y_is_same(),
@@ -641,11 +632,7 @@ impl SimpleGlyph {
             })
             .collect();
 
-        SimpleGlyph {
-            instruction_length,
-            instructions,
-            contours,
-        }
+        Contours { contours }
     }
 }
 
@@ -680,31 +667,30 @@ struct HeadTable {
 }
 
 impl HeadTable {
-    fn from_file(mut file: &File, offset: u64) -> HeadTable {
-        file.seek(SeekFrom::Start(offset))
-            .expect("Expected be able to seek");
+    fn from_file(file_ops: &mut FileOps, offset: u64) -> HeadTable {
+        file_ops.seek(SeekFrom::Start(offset));
 
-        let version = read_fixed(file);
-        let font_revision = read_fixed(file);
+        let version = file_ops.read_fixed();
+        let font_revision = file_ops.read_fixed();
 
-        let _checksum = read_u32(file);
-        let _magic_number = read_u32(file); // Must be 0x5F0F3CF5
-        let flags = read_u16(file);
-        let units_per_em = read_u16(file);
+        let _checksum = file_ops.read_u32();
+        let _magic_number = file_ops.read_u32(); // Must be 0x5F0F3CF5
+        let flags = file_ops.read_u16();
+        let units_per_em = file_ops.read_u16();
 
-        let created = read_long_date_time(file);
-        let modified = read_long_date_time(file);
+        let created = file_ops.read_long_date_time();
+        let modified = file_ops.read_long_date_time();
 
-        let x_min = read_fword(file);
-        let y_min = read_fword(file);
-        let x_max = read_fword(file);
-        let y_max = read_fword(file);
+        let x_min = file_ops.read_fword();
+        let y_min = file_ops.read_fword();
+        let x_max = file_ops.read_fword();
+        let y_max = file_ops.read_fword();
 
-        let mac_style = read_u16(file);
-        let lowest_rec_ppem = read_u16(file);
-        let font_direction_hint = read_i16(file);
-        let index_to_loc_format = read_i16(file);
-        let glyph_data_format = read_i16(file);
+        let mac_style = file_ops.read_u16();
+        let lowest_rec_ppem = file_ops.read_u16();
+        let font_direction_hint = file_ops.read_i16();
+        let index_to_loc_format = file_ops.read_i16();
+        let glyph_data_format = file_ops.read_i16();
 
         HeadTable {
             version,
@@ -753,18 +739,18 @@ struct Segment {
     id_range_offset: u16,
 }
 
-struct FileOps<'a> {
-    file: &'a File,
+struct FileOps {
+    file: File,
 }
 
-impl<'a> FileOps<'a> {
+impl FileOps {
     fn seek(&mut self, seek_from: SeekFrom) {
         self.file.seek(seek_from).expect("Expected be able to seek");
     }
 
     fn read_end_code(&mut self, current_search_range: i64) -> u16 {
         self.seek(SeekFrom::Current(current_search_range));
-        let end_code = read_u16(self.file);
+        let end_code = self.read_u16();
 
         // Reset last read offset shift
         self.seek(SeekFrom::Current(-2));
@@ -775,7 +761,7 @@ impl<'a> FileOps<'a> {
         self.seek(SeekFrom::Current(2)); // Skip reservedPad
         self.seek(SeekFrom::Current(seg_count_x2 as i64));
 
-        let start_code = read_u16(self.file);
+        let start_code = self.read_u16();
 
         // Reset last read offset shift
         self.seek(SeekFrom::Current(-2));
@@ -786,7 +772,7 @@ impl<'a> FileOps<'a> {
     fn read_id_delta(&mut self, seg_count_x2: u16) -> u16 {
         self.seek(SeekFrom::Current(seg_count_x2 as i64));
 
-        let id_delta = read_u16(self.file);
+        let id_delta = self.read_u16();
 
         self.seek(SeekFrom::Current(-2));
 
@@ -796,7 +782,7 @@ impl<'a> FileOps<'a> {
     fn read_id_range_offset(&mut self, seg_count_x2: u16) -> u16 {
         self.seek(SeekFrom::Current(seg_count_x2 as i64));
 
-        let id_range_offset = read_u16(self.file);
+        let id_range_offset = self.read_u16();
 
         self.seek(SeekFrom::Current(-2));
 
@@ -808,18 +794,86 @@ impl<'a> FileOps<'a> {
             .stream_position()
             .expect("Expected to read stream position")
     }
+
+    fn read_platform_id(&mut self) -> PlatformId {
+        let platform_id: u16 = self.read_u16();
+        match platform_id {
+            0 => PlatformId::Unicode,
+            1 => PlatformId::Macintosh,
+            2 => PlatformId::Reserved,
+            3 => PlatformId::Microsoft,
+            _ => panic!("Unknown PlatformId {:?}", platform_id),
+        }
+    }
+
+    fn read_fword(&mut self) -> FWord {
+        let fword = self.read_i16();
+        FWord(fword)
+    }
+
+    fn read_long_date_time(&mut self) -> i64 {
+        let mut buffer = [0; 8];
+        self.file.read_exact(&mut buffer).expect("Can't read i64");
+        i64::from_be_bytes(buffer)
+    }
+
+    fn read_fixed(&mut self) -> Fixed {
+        let major = self.read_u16();
+        let minor = self.read_u16();
+        Fixed { major, minor }
+    }
+
+    fn read_u8(&mut self) -> u8 {
+        let mut buffer = [0; 1];
+        self.file.read_exact(&mut buffer).expect("Can't read u8");
+        u8::from_be_bytes(buffer)
+    }
+
+    fn read_i8(&mut self) -> i8 {
+        let mut buffer = [0; 1];
+        self.file.read_exact(&mut buffer).expect("Can't read i8");
+        i8::from_be_bytes(buffer)
+    }
+
+    fn read_u16(&mut self) -> u16 {
+        let mut buffer = [0; 2];
+        self.file.read_exact(&mut buffer).expect("Can't read u16");
+        u16::from_be_bytes(buffer)
+    }
+
+    fn read_i16(&mut self) -> i16 {
+        let mut buffer = [0; 2];
+        self.file.read_exact(&mut buffer).expect("Can't read i16");
+        i16::from_be_bytes(buffer)
+    }
+
+    fn read_u32(&mut self) -> u32 {
+        let mut buffer = [0; 4];
+        self.file
+            .read_exact(&mut buffer)
+            .expect("Exprected to read u32");
+        u32::from_be_bytes(buffer)
+    }
+
+    fn read_table_name(&mut self) -> String {
+        let mut tag = [0; 4];
+        self.file
+            .read_exact(&mut tag)
+            .expect("Can't read table name");
+        String::from_utf8_lossy(&tag).to_string()
+    }
 }
 
 impl CMapSubtable {
-    fn find_char_code_segment(file: &File, char_code: u16) -> GlyphId {
-        let subtable_format = read_u16(file);
-        let length = read_u16(file);
-        let version = read_u16(file);
+    fn find_char_code_segment(file_ops: &mut FileOps, char_code: u16) -> GlyphId {
+        let subtable_format = file_ops.read_u16();
+        let length = file_ops.read_u16();
+        let version = file_ops.read_u16();
 
-        let seg_count_x2 = read_u16(file); // The segCount is the number of contiguous code ranges in the font
-        let search_range = read_u16(file); // TODO compute this from seg_count_x2
-        let entry_selector = read_u16(file); // TODO compute this from seg_count_x2
-        let range_shift = read_u16(file); // Do not use
+        let seg_count_x2 = file_ops.read_u16(); // The segCount is the number of contiguous code ranges in the font
+        let search_range = file_ops.read_u16(); // TODO compute this from seg_count_x2
+        let entry_selector = file_ops.read_u16(); // TODO compute this from seg_count_x2
+        let range_shift = file_ops.read_u16(); // Do not use
 
         println!("[CMapSubtable] subtable_format {:?}", subtable_format);
         println!("[CMapSubtable] length {:?}", length);
@@ -829,8 +883,6 @@ impl CMapSubtable {
         println!("[CMapSubtable] search_range {:?}", search_range);
         println!("[CMapSubtable] entry_selector {:?}", entry_selector);
         println!("[CMapSubtable] range_shift {:?}", range_shift);
-
-        let file_ops = FileOps { file };
 
         let mut index_lookup = GlyphIndexLookup {
             file_ops,
@@ -843,7 +895,7 @@ impl CMapSubtable {
 }
 
 struct GlyphIndexLookup<'a> {
-    file_ops: FileOps<'a>,
+    file_ops: &'a mut FileOps,
     seg_count_x2: u16,
     char_code: u16,
 }
@@ -861,10 +913,6 @@ impl<'a> GlyphIndexLookup<'a> {
         self.file_ops.read_id_range_offset(self.seg_count_x2)
     }
 
-    fn read_u16(&mut self) -> u16 {
-        read_u16(self.file_ops.file)
-    }
-
     fn seek_glyph_id(&mut self, search_range: u16, entry_selector: u16) -> GlyphId {
         let end_code = self.file_ops.read_end_code(search_range as i64);
 
@@ -878,7 +926,7 @@ impl<'a> GlyphIndexLookup<'a> {
     fn sequential_search(&mut self) -> GlyphId {
         self.file_ops.seek(SeekFrom::Current(2));
 
-        let next_end_code = self.read_u16();
+        let next_end_code = self.file_ops.read_u16();
 
         if next_end_code >= self.char_code {
             self.file_ops.seek(SeekFrom::Current(-2));
@@ -934,7 +982,7 @@ impl<'a> GlyphIndexLookup<'a> {
 
             self.file_ops
                 .seek(SeekFrom::Start(glyph_index_address as u64));
-            self.read_u16() as u32
+            self.file_ops.read_u16() as u32
         } else {
             // If the id_range_offset is 0, the id_delta value is added directly to the character code to get the corresponding glyph index
             id_delta as u32 + self.char_code as u32
@@ -953,19 +1001,18 @@ struct CMapTable {
 }
 
 impl CMapTable {
-    fn mk_cmap_table(mut file: &File, offset: u64, char_code: u16) -> GlyphId {
-        file.seek(SeekFrom::Start(offset))
-            .expect("Expected be able to seek");
+    fn mk_cmap_table(file_ops: &mut FileOps, offset: u64, char_code: u16) -> GlyphId {
+        file_ops.seek(SeekFrom::Start(offset));
 
-        let version = read_u16(file);
-        let number_subtables = read_u16(file);
+        let version = file_ops.read_u16();
+        let number_subtables = file_ops.read_u16();
         println!("[CMapTable] version {}", version);
         println!("[CMapTable] number_subtables {}", number_subtables);
 
         for i in 0..number_subtables {
-            let platform_id = read_platform_id(file);
-            let platform_specific_id = read_u16(file);
-            let offset = read_u32(file);
+            let platform_id = file_ops.read_platform_id();
+            let platform_specific_id = file_ops.read_u16();
+            let offset = file_ops.read_u32();
 
             println!("[CMapTable] platform_id_{} {:?}", i, platform_id);
             println!(
@@ -977,72 +1024,8 @@ impl CMapTable {
 
         // TODO select the best table. (Is it just a coincidence that Unicode table follows first?)
 
-        CMapSubtable::find_char_code_segment(file, char_code)
+        CMapSubtable::find_char_code_segment(file_ops, char_code)
     }
-}
-
-fn read_platform_id(file: &File) -> PlatformId {
-    let platform_id: u16 = read_u16(file);
-    match platform_id {
-        0 => PlatformId::Unicode,
-        1 => PlatformId::Macintosh,
-        2 => PlatformId::Reserved,
-        3 => PlatformId::Microsoft,
-        _ => panic!("Unknown PlatformId {:?}", platform_id),
-    }
-}
-
-fn read_fword(file: &File) -> FWord {
-    let fword = read_i16(file);
-    FWord(fword)
-}
-
-fn read_long_date_time(mut file: &File) -> i64 {
-    let mut buffer = [0; 8];
-    file.read_exact(&mut buffer).expect("Can't read i64");
-    i64::from_be_bytes(buffer)
-}
-
-fn read_fixed(file: &File) -> Fixed {
-    let major = read_u16(file);
-    let minor = read_u16(file);
-    Fixed { major, minor }
-}
-
-fn read_u8(mut file: &File) -> u8 {
-    let mut buffer = [0; 1];
-    file.read_exact(&mut buffer).expect("Can't read u8");
-    u8::from_be_bytes(buffer)
-}
-
-fn read_i8(mut file: &File) -> i8 {
-    let mut buffer = [0; 1];
-    file.read_exact(&mut buffer).expect("Can't read i8");
-    i8::from_be_bytes(buffer)
-}
-
-fn read_u16(mut file: &File) -> u16 {
-    let mut buffer = [0; 2];
-    file.read_exact(&mut buffer).expect("Can't read u16");
-    u16::from_be_bytes(buffer)
-}
-
-fn read_i16(mut file: &File) -> i16 {
-    let mut buffer = [0; 2];
-    file.read_exact(&mut buffer).expect("Can't read i16");
-    i16::from_be_bytes(buffer)
-}
-
-fn read_u32(mut file: &File) -> u32 {
-    let mut buffer = [0; 4];
-    file.read_exact(&mut buffer).expect("Exprected to read u32");
-    u32::from_be_bytes(buffer)
-}
-
-fn read_table_name(mut file: &File) -> String {
-    let mut tag = [0; 4];
-    file.read_exact(&mut tag).expect("Can't read table name");
-    String::from_utf8_lossy(&tag).to_string()
 }
 
 pub fn read_font_file(char_code: u16) -> GlyphData {
@@ -1050,13 +1033,15 @@ pub fn read_font_file(char_code: u16) -> GlyphData {
 
     let file: File = File::open(file_path).expect("Should been able to open the file");
 
-    let os: OffsetSubtable = OffsetSubtable::from_file(&file);
+    let mut file_ops: FileOps = FileOps { file };
+
+    let os: OffsetSubtable = OffsetSubtable::from_file(&mut file_ops);
 
     println!("Read {:?} os", os);
 
     let table_dictionary: Vec<TableDirectory> = (0..os.num_tables)
         .into_iter()
-        .map(|_| TableDirectory::from_file(&file))
+        .map(|_| TableDirectory::from_file(&mut file_ops))
         .collect();
 
     // table_dictionary
@@ -1080,15 +1065,16 @@ pub fn read_font_file(char_code: u16) -> GlyphData {
     let glyf_table = maybe_glyf_table.expect("'glyf' table not found");
     let cmap_table = maybe_cmap_table.expect("'cmap' table not found");
 
-    let head_table_content = HeadTable::from_file(&file, head_table.offset as u64);
+    let head_table_content = HeadTable::from_file(&mut file_ops, head_table.offset as u64);
     println!("Head table {:?} ", head_table_content);
 
-    let maximum_profile_table = MaximumProfileTable::from_file(&file, maxp_table.offset as u64);
+    let maximum_profile_table =
+        MaximumProfileTable::from_file(&mut file_ops, maxp_table.offset as u64);
     println!("Maximum profile table {:?} ", maximum_profile_table);
 
     println!("LOCA TABLE {:?} ", loca_table);
     let lolll: IndexToLocTable = IndexToLocTable::mk_index_to_loc_table(
-        &file,
+        &mut file_ops,
         loca_table.offset as u64,
         head_table_content,
         maximum_profile_table,
@@ -1096,13 +1082,17 @@ pub fn read_font_file(char_code: u16) -> GlyphData {
 
     println!("Read {:?} os", glyf_table);
 
-    let glyph_id = CMapTable::mk_cmap_table(&file, cmap_table.offset as u64, char_code);
+    let glyph_id = CMapTable::mk_cmap_table(&mut file_ops, cmap_table.offset as u64, char_code);
 
     let glyph_offset = lolll.index_for(&glyph_id);
 
     println!("glyph_id {:?} glyph_offset {} ", glyph_id, glyph_offset);
-    let glyph_table_content =
-        GlyphTable::mk_glyph_table(&file, glyf_table.offset as u64, glyph_offset, glyph_id);
+    let glyph_table_content = GlyphTable::mk_glyph_table(
+        &mut file_ops,
+        glyf_table.offset as u64,
+        glyph_offset,
+        glyph_id,
+    );
     println!("glyph_offset {:?} ", glyph_offset);
     println!("glyph_table_content {:?}", glyph_table_content);
 
