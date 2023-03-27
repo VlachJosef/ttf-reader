@@ -27,8 +27,8 @@ struct MaximumProfileTable {
 }
 
 impl MaximumProfileTable {
-    fn from_file(file_ops: &mut FileOps, offset: u64) -> MaximumProfileTable {
-        file_ops.seek(SeekFrom::Start(offset));
+    fn from_file(file_ops: &mut FileOps, offset: u32) -> MaximumProfileTable {
+        file_ops.seek_from_start(offset);
         let version: Fixed = file_ops.read_fixed();
         let num_glyphs: u16 = file_ops.read_u16();
         let max_points: u16 = file_ops.read_u16();
@@ -129,11 +129,11 @@ impl IndexToLocTable {
 
     fn mk_index_to_loc_table(
         file_ops: &mut FileOps,
-        offset: u64,
+        offset: u32,
         head_table: HeadTable,
         maximum_profile_table: MaximumProfileTable,
     ) -> IndexToLocTable {
-        file_ops.seek(SeekFrom::Start(offset));
+        file_ops.seek_from_start(offset);
         let data: Vec<u32> = match head_table.index_to_loc_format {
             0 => todo!("                       SHORT"),
             1 => (0..maximum_profile_table.num_glyphs)
@@ -272,19 +272,19 @@ impl GlyphTable {
         } else {
             let gc = GlyphComponent::new(file_ops);
 
-            let aaa: Vec<ComponentData> = gc.collect();
+            let components: Vec<ComponentData> = gc.collect();
 
-            GlyphData::CompountGlyph { components: aaa }
+            GlyphData::CompountGlyph { components }
         }
     }
 
     fn mk_glyph_table(
         file_ops: &mut FileOps,
-        offset: u64,
+        offset: u32,
         glyph_offset: u32,
         glyph_id: GlyphId,
     ) -> GlyphData {
-        file_ops.seek(SeekFrom::Start(offset + glyph_offset as u64));
+        file_ops.seek_from_start(offset + glyph_offset);
 
         Self::read_glyph(file_ops, glyph_id)
     }
@@ -358,32 +358,21 @@ impl ComponentFlag {
     }
 
     #[allow(unused)]
+    #[rustfmt::skip]
     fn pretty_print(&self) {
-        println!(
-            "arg1_and_arg2_are_words  {}",
-            self.arg1_and_arg2_are_words()
-        );
+        println!("arg1_and_arg2_are_words  {}", self.arg1_and_arg2_are_words());
         println!("args_are_xy_values       {}", self.args_are_xy_values());
         println!("round_xy_to_grid         {}", self.round_xy_to_grid());
         println!("we_have_a_scale          {}", self.we_have_a_scale());
         println!("obsolete                 {}", self.obsolete());
         println!("more_components          {}", self.more_components());
-        println!(
-            "we_have_an_x_and_y_scale {}",
-            self.we_have_an_x_and_y_scale()
-        );
+        println!("we_have_an_x_and_y_scale {}", self.we_have_an_x_and_y_scale());
         println!("we_have_a_two_by_two     {}", self.we_have_a_two_by_two());
         println!("we_have_instructions     {}", self.we_have_instructions());
         println!("use_my_metrics           {}", self.use_my_metrics());
         println!("overlap_compound         {}", self.overlap_compound());
-        println!(
-            "scaled_component_offset  {}",
-            self.scaled_component_offset()
-        );
-        println!(
-            "unscaled_component_offset{}",
-            self.unscaled_component_offset()
-        );
+        println!("scaled_component_offset  {}", self.scaled_component_offset());
+        println!("unscaled_component_offset{}", self.unscaled_component_offset());
     }
 
     fn is_set(&self, bit: u8) -> bool {
@@ -667,8 +656,8 @@ struct HeadTable {
 }
 
 impl HeadTable {
-    fn from_file(file_ops: &mut FileOps, offset: u64) -> HeadTable {
-        file_ops.seek(SeekFrom::Start(offset));
+    fn from_file(file_ops: &mut FileOps, offset: u32) -> HeadTable {
+        file_ops.seek_from_start(offset);
 
         let version = file_ops.read_fixed();
         let font_revision = file_ops.read_fixed();
@@ -744,6 +733,9 @@ struct FileOps {
 }
 
 impl FileOps {
+    fn seek_from_start(&mut self, seek_from: u32) {
+        self.seek(SeekFrom::Start(seek_from as u64));
+    }
     fn seek(&mut self, seek_from: SeekFrom) {
         self.file.seek(seek_from).expect("Expected be able to seek");
     }
@@ -980,8 +972,7 @@ impl<'a> GlyphIndexLookup<'a> {
                 + 2 * ((self.char_code - start_code) as u32)
                 + address as u32;
 
-            self.file_ops
-                .seek(SeekFrom::Start(glyph_index_address as u64));
+            self.file_ops.seek_from_start(glyph_index_address);
             self.file_ops.read_u16() as u32
         } else {
             // If the id_range_offset is 0, the id_delta value is added directly to the character code to get the corresponding glyph index
@@ -1001,9 +992,8 @@ struct CMapTable {
 }
 
 impl CMapTable {
-    fn mk_cmap_table(file_ops: &mut FileOps, offset: u64, char_code: u16) -> GlyphId {
-        file_ops.seek(SeekFrom::Start(offset));
-
+    fn mk_cmap_table(file_ops: &mut FileOps, offset: u32, char_code: u16) -> GlyphId {
+        file_ops.seek_from_start(offset);
         let version = file_ops.read_u16();
         let number_subtables = file_ops.read_u16();
         println!("[CMapTable] version {}", version);
@@ -1065,34 +1055,29 @@ pub fn read_font_file(char_code: u16) -> GlyphData {
     let glyf_table = maybe_glyf_table.expect("'glyf' table not found");
     let cmap_table = maybe_cmap_table.expect("'cmap' table not found");
 
-    let head_table_content = HeadTable::from_file(&mut file_ops, head_table.offset as u64);
+    let head_table_content = HeadTable::from_file(&mut file_ops, head_table.offset);
     println!("Head table {:?} ", head_table_content);
 
-    let maximum_profile_table =
-        MaximumProfileTable::from_file(&mut file_ops, maxp_table.offset as u64);
+    let maximum_profile_table = MaximumProfileTable::from_file(&mut file_ops, maxp_table.offset);
     println!("Maximum profile table {:?} ", maximum_profile_table);
 
     println!("LOCA TABLE {:?} ", loca_table);
     let lolll: IndexToLocTable = IndexToLocTable::mk_index_to_loc_table(
         &mut file_ops,
-        loca_table.offset as u64,
+        loca_table.offset,
         head_table_content,
         maximum_profile_table,
     );
 
     println!("Read {:?} os", glyf_table);
 
-    let glyph_id = CMapTable::mk_cmap_table(&mut file_ops, cmap_table.offset as u64, char_code);
+    let glyph_id = CMapTable::mk_cmap_table(&mut file_ops, cmap_table.offset, char_code);
 
     let glyph_offset = lolll.index_for(&glyph_id);
 
     println!("glyph_id {:?} glyph_offset {} ", glyph_id, glyph_offset);
-    let glyph_table_content = GlyphTable::mk_glyph_table(
-        &mut file_ops,
-        glyf_table.offset as u64,
-        glyph_offset,
-        glyph_id,
-    );
+    let glyph_table_content =
+        GlyphTable::mk_glyph_table(&mut file_ops, glyf_table.offset, glyph_offset, glyph_id);
     println!("glyph_offset {:?} ", glyph_offset);
     println!("glyph_table_content {:?}", glyph_table_content);
 
