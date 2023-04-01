@@ -1,7 +1,7 @@
 use crate::contours_reader::ContoursReader;
-use crate::file_ops::FileOps;
 use crate::font_directory::FontDirectory;
 use crate::model::{ArgumentTypes, ComponentData, Glyph, GlyphId};
+use crate::reader::{FileOps, Reader, VecOps};
 use crate::table::cmap_table::CMapSubtable;
 use crate::table::head_table::HeadTable;
 use crate::table::hhea_table::HheaTable;
@@ -14,7 +14,7 @@ use crate::Segment;
 use std::fs::File;
 
 pub struct GlyphReader {
-    file_ops: FileOps,
+    reader: Box<dyn Reader>,
     glyf_table_offset: u32,
     glyph_id_offset_lookup: GlyphIdOffsetLookup,
     cmap_subtable: CMapSubtable,
@@ -23,16 +23,22 @@ pub struct GlyphReader {
 }
 
 impl GlyphReader {
-    pub fn display_font_info(&mut self) {
-        let name_table = self.font_directory.table_directory("name");
+    pub fn from_vec(v: Vec<u8>) -> GlyphReader {
+        let vec_ops: VecOps = VecOps::from_vec(v);
+        let reader: Box<dyn Reader> = Box::new(vec_ops);
 
-        name_table::read_name(&mut self.file_ops, name_table);
+        Self::from_reader(reader)
     }
 
     pub fn from_file(file: File) -> GlyphReader {
-        let mut file_ops: FileOps = FileOps::from_file(file);
+        let file_ops: FileOps = FileOps::from_file(file);
+        let reader: Box<dyn Reader> = Box::new(file_ops);
 
-        let font_directory: FontDirectory = FontDirectory::from_file(&mut file_ops);
+        Self::from_reader(reader)
+    }
+
+    fn from_reader(mut reader: Box<dyn Reader>) -> GlyphReader {
+        let font_directory: FontDirectory = FontDirectory::from_file(&mut reader);
 
         let loca_table = font_directory.table_directory("loca");
         let glyf_table = font_directory.table_directory("glyf");
@@ -42,34 +48,33 @@ impl GlyphReader {
         let hhea_table = font_directory.table_directory("hhea");
         let htmx_table = font_directory.table_directory("hmtx");
 
-        let head_table = HeadTable::from_file(&mut file_ops, head_table.offset);
+        let head_table = HeadTable::from_file(&mut reader, head_table.offset);
 
-        let maximum_profile_table =
-            MaximumProfileTable::from_file(&mut file_ops, maxp_table.offset);
+        let maximum_profile_table = MaximumProfileTable::from_file(&mut reader, maxp_table.offset);
 
-        let hhea_table = HheaTable::from_file(&mut file_ops, hhea_table.offset);
+        let hhea_table = HheaTable::from_file(&mut reader, hhea_table.offset);
 
         let long_hor_metric_lookup = LongHorMetricLookup::from_file(
-            &mut file_ops,
+            &mut reader,
             htmx_table.offset,
             hhea_table,
             &maximum_profile_table,
         );
+
         let glyph_id_offset_lookup: GlyphIdOffsetLookup =
             GlyphIdOffsetLookup::mk_glyph_id_to_offset(
-                &mut file_ops,
+                &mut reader,
                 loca_table.offset,
                 &head_table,
                 &maximum_profile_table,
             );
 
-        let cmap_subtable: CMapSubtable =
-            CMapSubtable::find_cmap_subtable(&mut file_ops, cmap_table);
+        let cmap_subtable: CMapSubtable = CMapSubtable::find_cmap_subtable(&mut reader, cmap_table);
 
         let glyf_table_offset = glyf_table.offset;
 
         GlyphReader {
-            file_ops,
+            reader,
             glyf_table_offset,
             glyph_id_offset_lookup,
             cmap_subtable,
@@ -78,23 +83,25 @@ impl GlyphReader {
         }
     }
 
-    pub fn glyph_for_glyph_id(&mut self, glyph_id: GlyphId) -> Glyph {
-        self.read(glyph_id)
+    pub fn display_font_info(&mut self) {
+        let name_table = self.font_directory.table_directory("name");
+
+        name_table::read_name(&mut self.reader, name_table);
     }
 
     pub fn cmap_table_segments(&mut self) -> Vec<Segment> {
-        self.cmap_subtable.segments(&mut self.file_ops)
+        self.cmap_subtable.segments(&mut self.reader)
     }
 
     pub fn char_code_to_glyph_id(&mut self, char_code: u16) -> GlyphId {
         self.cmap_subtable
-            .find_glyph_id(&mut self.file_ops, char_code)
+            .find_glyph_id(&mut self.reader, char_code)
     }
 
     pub fn read_glyph(&mut self, char_code: u16) -> Glyph {
         let glyph_id = self.char_code_to_glyph_id(char_code);
 
-        self.read(glyph_id)
+        self.glyph_for_glyph_id(glyph_id)
     }
 
     pub fn all_char_codes(&mut self) -> Vec<u16> {
@@ -105,7 +112,7 @@ impl GlyphReader {
             .collect::<Vec<u16>>()
     }
 
-    fn read(&mut self, glyph_id: GlyphId) -> Glyph {
+    pub fn glyph_for_glyph_id(&mut self, glyph_id: GlyphId) -> Glyph {
         let glyph_offset = self
             .glyph_id_offset_lookup
             .0
@@ -130,18 +137,18 @@ impl GlyphReader {
                 left_side_bearing,
             }
         } else {
-            self.file_ops
+            self.reader
                 .seek_from_start(self.glyf_table_offset + glyph_offset.offset());
 
-            let number_of_contours = self.file_ops.read_i16();
-            let x_min = self.file_ops.read_fword();
-            let y_min = self.file_ops.read_fword();
-            let x_max = self.file_ops.read_fword();
-            let y_max = self.file_ops.read_fword();
+            let number_of_contours = self.reader.read_i16();
+            let x_min = self.reader.read_fword();
+            let y_min = self.reader.read_fword();
+            let x_max = self.reader.read_fword();
+            let y_max = self.reader.read_fword();
 
             // if >= 0 it is a single glyph; if < 0 the glyph is compound
             if number_of_contours >= 0 {
-                let mut contours_reader = ContoursReader::new(&mut self.file_ops);
+                let mut contours_reader = ContoursReader::new(&mut self.reader);
                 let simple_glyph = contours_reader.read_contours(number_of_contours);
                 let contours = simple_glyph.contours;
                 Glyph::Simple {
@@ -155,7 +162,7 @@ impl GlyphReader {
                     contours,
                 }
             } else {
-                let gc = GlyphComponent::new(&mut self.file_ops);
+                let gc = GlyphComponent::new(&mut self.reader);
 
                 let components: Vec<ComponentData> = gc.collect();
 
@@ -175,14 +182,14 @@ impl GlyphReader {
 }
 
 struct GlyphComponent<'a> {
-    file_ops: &'a mut FileOps,
+    reader: &'a mut Box<dyn Reader>,
     has_more: bool,
 }
 
 impl<'a> GlyphComponent<'a> {
-    fn new(file_ops: &'a mut FileOps) -> GlyphComponent<'a> {
+    fn new(reader: &'a mut Box<dyn Reader>) -> GlyphComponent<'a> {
         GlyphComponent {
-            file_ops,
+            reader,
             has_more: true,
         }
     }
@@ -193,41 +200,41 @@ impl<'a> Iterator for GlyphComponent<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.has_more {
-            let component_flag = ComponentFlag::from_file(self.file_ops);
+            let component_flag = ComponentFlag::from_file(self.reader);
 
-            let glyph_index = self.file_ops.read_u16();
+            let glyph_index = self.reader.read_u16();
             let argument_types = if component_flag.arg1_and_arg2_are_words() {
                 if component_flag.args_are_xy_values() {
-                    let arg1 = self.file_ops.read_i16();
-                    let arg2 = self.file_ops.read_i16();
+                    let arg1 = self.reader.read_i16();
+                    let arg2 = self.reader.read_i16();
                     ArgumentTypes::XYValue16(arg1, arg2)
                 } else {
-                    let arg1 = self.file_ops.read_u16();
-                    let arg2 = self.file_ops.read_u16();
+                    let arg1 = self.reader.read_u16();
+                    let arg2 = self.reader.read_u16();
                     ArgumentTypes::Point16(arg1, arg2)
                 }
             } else if component_flag.args_are_xy_values() {
-                let arg1 = self.file_ops.read_i8();
-                let arg2 = self.file_ops.read_i8();
+                let arg1 = self.reader.read_i8();
+                let arg2 = self.reader.read_i8();
                 ArgumentTypes::XYValue8(arg1, arg2)
             } else {
-                let arg1 = self.file_ops.read_u8();
-                let arg2 = self.file_ops.read_u8();
+                let arg1 = self.reader.read_u8();
+                let arg2 = self.reader.read_u8();
                 ArgumentTypes::Point8(arg1, arg2)
             };
 
             let (a, b, c, d) = if component_flag.we_have_a_scale() {
-                let scale = self.file_ops.read_i16();
+                let scale = self.reader.read_i16();
                 (scale, 0, 0, scale)
             } else if component_flag.we_have_an_x_and_y_scale() {
-                let x_scale = self.file_ops.read_i16();
-                let y_scale = self.file_ops.read_i16();
+                let x_scale = self.reader.read_i16();
+                let y_scale = self.reader.read_i16();
                 (x_scale, 0, 0, y_scale)
             } else if component_flag.we_have_a_two_by_two() {
-                let x_scale = self.file_ops.read_i16();
-                let scale_01 = self.file_ops.read_i16();
-                let scale_10 = self.file_ops.read_i16();
-                let y_scale = self.file_ops.read_i16();
+                let x_scale = self.reader.read_i16();
+                let scale_01 = self.reader.read_i16();
+                let scale_10 = self.reader.read_i16();
+                let y_scale = self.reader.read_i16();
                 (x_scale, scale_01, scale_10, y_scale)
             } else {
                 (1, 0, 0, 1)
@@ -255,8 +262,8 @@ impl<'a> Iterator for GlyphComponent<'a> {
 struct ComponentFlag(u16);
 
 impl ComponentFlag {
-    fn from_file(file_ops: &mut FileOps) -> ComponentFlag {
-        ComponentFlag(file_ops.read_u16())
+    fn from_file(reader: &mut Box<dyn Reader>) -> ComponentFlag {
+        ComponentFlag(reader.read_u16())
     }
 
     #[allow(unused)]

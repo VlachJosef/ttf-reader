@@ -1,16 +1,20 @@
-use crate::file_ops::FileOps;
 use crate::model::GlyphId;
+use crate::reader::Reader;
 
 pub struct GlyphIndexLookup<'a> {
-    file_ops: &'a mut FileOps,
+    reader: &'a mut Box<dyn Reader>,
     seg_count_x2: u16,
     char_code: u16,
 }
 
 impl<'a> GlyphIndexLookup<'a> {
-    pub fn new(file_ops: &'a mut FileOps, seg_count_x2: u16, char_code: u16) -> GlyphIndexLookup {
+    pub fn new(
+        reader: &'a mut Box<dyn Reader>,
+        seg_count_x2: u16,
+        char_code: u16,
+    ) -> GlyphIndexLookup {
         GlyphIndexLookup {
-            file_ops,
+            reader,
             seg_count_x2,
             char_code,
         }
@@ -18,13 +22,12 @@ impl<'a> GlyphIndexLookup<'a> {
 
     fn reset_to_end_code_read(&mut self) {
         // Go from start_code array (+reservedPad) back to end_code array
-        self.file_ops
-            .seek_from_current(-2 - self.seg_count_x2 as i32);
+        self.reader.seek_from_current(-2 - self.seg_count_x2 as i32);
     }
 
     // First segment is not covered by binary search, so it needs to be checked explicitly
     pub fn check_first_segment(&mut self) -> Option<GlyphId> {
-        let end_code = self.file_ops.read_end_code(0);
+        let end_code = self.reader.read_end_code(0);
         let start_code = self.read_start_code();
         if self.char_code <= end_code && self.char_code >= start_code {
             let id_delta = self.read_id_delta();
@@ -43,7 +46,7 @@ impl<'a> GlyphIndexLookup<'a> {
         match maybe_glyph_id {
             Some(glyph_id) => glyph_id,
             None => {
-                let end_code = self.file_ops.read_end_code(search_range as i32);
+                let end_code = self.reader.read_end_code(search_range as i32);
 
                 if self.char_code > end_code {
                     self.sequential_search()
@@ -55,10 +58,10 @@ impl<'a> GlyphIndexLookup<'a> {
     }
 
     fn sequential_search(&mut self) -> GlyphId {
-        let next_end_code = self.file_ops.read_u16();
+        let next_end_code = self.reader.read_u16();
 
         if next_end_code >= self.char_code {
-            self.file_ops.seek_from_current(-2);
+            self.reader.seek_from_current(-2);
             let start_code = self.read_start_code();
             let id_delta = self.read_id_delta();
             let id_range_offset = self.read_id_range_offset();
@@ -91,7 +94,7 @@ impl<'a> GlyphIndexLookup<'a> {
             };
 
             self.reset_to_end_code_read();
-            let end_code = self.file_ops.read_end_code(end_code_range);
+            let end_code = self.reader.read_end_code(end_code_range);
             self.binary_search(end_code, search_range, entry_selector - 1)
         }
     }
@@ -101,14 +104,14 @@ impl<'a> GlyphIndexLookup<'a> {
             // If the id_range_offset is 0, the id_delta value is added directly to the character code to get the corresponding glyph index
             id_delta as u32 + self.char_code as u32
         } else {
-            let address = self.file_ops.read_address();
+            let address = self.reader.read_address();
 
             let glyph_index_address = id_range_offset as u32
                 + 2 * ((self.char_code - start_code) as u32)
                 + address as u32;
 
-            self.file_ops.seek_from_start(glyph_index_address);
-            self.file_ops.read_u16() as u32
+            self.reader.seek_from_start(glyph_index_address);
+            self.reader.read_u16() as u32
         };
 
         // NOTE: All id_delta[i] arithmetic is modulo 65536.
@@ -118,14 +121,14 @@ impl<'a> GlyphIndexLookup<'a> {
     }
 
     fn read_start_code(&mut self) -> u16 {
-        self.file_ops.read_start_code(self.seg_count_x2)
+        self.reader.read_start_code(self.seg_count_x2)
     }
 
     fn read_id_delta(&mut self) -> u16 {
-        self.file_ops.read_id_delta(self.seg_count_x2)
+        self.reader.read_id_delta(self.seg_count_x2)
     }
 
     fn read_id_range_offset(&mut self) -> u16 {
-        self.file_ops.read_id_range_offset(self.seg_count_x2)
+        self.reader.read_id_range_offset(self.seg_count_x2)
     }
 }

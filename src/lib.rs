@@ -1,46 +1,16 @@
-use crate::glyph_reader::GlyphReader;
+pub use crate::glyph_reader::GlyphReader;
 pub use crate::model::{Glyph, GlyphId};
 use crate::table::cmap_table::Segment;
-use std::fs::File;
 
 mod contours_reader;
-mod file_ops;
 mod font_directory;
 mod glyph_index_lookup;
 mod glyph_reader;
 mod model;
+mod reader;
 mod table;
 
-fn read_file(file_path: &str) -> File {
-    File::open(file_path).expect("Should been able to open the file")
-}
-
-fn mk_glyph_reader(file_path: &str) -> GlyphReader {
-    let file: File = read_file(file_path);
-
-    GlyphReader::from_file(file)
-}
-
-pub fn read_glyph(char_code: u16, file_path: &str) -> Glyph {
-    let mut glyph_reader = mk_glyph_reader(file_path);
-
-    glyph_reader.read_glyph(char_code)
-}
-
-pub fn read_glyph_id(glyph_id: GlyphId, file_path: &str) -> Glyph {
-    let mut glyph_reader = mk_glyph_reader(file_path);
-
-    glyph_reader.glyph_for_glyph_id(glyph_id)
-}
-
-pub fn cmap_table_segments(file_path: &str) -> Vec<Segment> {
-    let mut glyph_reader = mk_glyph_reader(file_path);
-    glyph_reader.cmap_table_segments()
-}
-
-pub fn all_glyphs(file_path: &str) -> Vec<Glyph> {
-    let mut glyph_reader = mk_glyph_reader(file_path);
-
+pub fn all_glyphs(mut glyph_reader: GlyphReader) -> Vec<Glyph> {
     let all_chars: Vec<u16> = glyph_reader.all_char_codes();
 
     let all_glyphs: Vec<Glyph> = all_chars
@@ -55,15 +25,12 @@ pub fn all_glyphs(file_path: &str) -> Vec<Glyph> {
     all_glyphs
 }
 
-pub fn display_font_info(file_path: &str) {
-    let mut glyph_reader = mk_glyph_reader(file_path);
-    glyph_reader.display_font_info()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::model::{ArgumentTypes, Contour, Point, PointType};
+    use std::fs;
+    use std::fs::File;
 
     macro_rules! mk_segments {
         ($index:literal, $start_code:literal, $end_code:literal, $id_delta:literal, $id_range_offset:literal) => {{
@@ -85,6 +52,43 @@ mod tests {
                 ],
             }
         }};
+    }
+
+    fn mk_glyph_reader_file(file_path: &str) -> GlyphReader {
+        let file: File = File::open(file_path).expect("Should been able to open the file");
+
+        GlyphReader::from_file(file)
+    }
+
+    fn mk_glyph_reader_vec(file_path: &str) -> GlyphReader {
+        let vec = fs::read(file_path).unwrap();
+
+        GlyphReader::from_vec(vec)
+    }
+
+    fn read_char_code_file(char_code: u16, file_path: &str) -> Glyph {
+        let mut glyph_reader = mk_glyph_reader_file(file_path);
+        glyph_reader.read_glyph(char_code)
+    }
+
+    fn read_char_code_vec(char_code: u16, file_path: &str) -> Glyph {
+        let mut glyph_reader = mk_glyph_reader_vec(file_path);
+        glyph_reader.read_glyph(char_code)
+    }
+
+    fn read_glyph_id_file(glyph_id: GlyphId, file_path: &str) -> Glyph {
+        let mut glyph_reader = mk_glyph_reader_file(file_path);
+        glyph_reader.glyph_for_glyph_id(glyph_id)
+    }
+
+    fn read_glyph_id_vec(glyph_id: GlyphId, file_path: &str) -> Glyph {
+        let mut glyph_reader = mk_glyph_reader_vec(file_path);
+        glyph_reader.glyph_for_glyph_id(glyph_id)
+    }
+
+    fn cmap_table_segments(file_path: &str) -> Vec<Segment> {
+        let mut glyph_reader = mk_glyph_reader_file(file_path);
+        glyph_reader.cmap_table_segments()
     }
 
     #[test]
@@ -232,7 +236,7 @@ mod tests {
 
     #[test]
     fn all_char_codes_zeyada() {
-        let mut glyph_reader = mk_glyph_reader("fonts/Zeyada_1.ttf");
+        let mut glyph_reader = mk_glyph_reader_file("fonts/Zeyada_1.ttf");
 
         let char_codes = glyph_reader.all_char_codes();
 
@@ -266,7 +270,7 @@ mod tests {
 
     #[test]
     fn test_char_code_to_glyph_id() {
-        let mut glyph_reader = mk_glyph_reader("fonts/Zeyada_1.ttf");
+        let mut glyph_reader = mk_glyph_reader_file("fonts/Zeyada_1.ttf");
 
         let char_codes: Vec<u16> = glyph_reader.all_char_codes();
 
@@ -627,7 +631,18 @@ mod tests {
 
     #[test]
     fn notdef_0() {
-        let result = read_glyph_id(GlyphId::new(0), "fonts/Zeyada_1.ttf");
+        let result = read_glyph_id_file(GlyphId::new(0), "fonts/Zeyada_1.ttf");
+
+        match result {
+            Glyph::Empty { .. } => assert!(true),
+            Glyph::Compount { .. } => panic!("Expected Empty glyph"),
+            Glyph::Simple { .. } => panic!("Expected Empty glyph"),
+        }
+    }
+
+    #[test]
+    fn notdef_0_vec() {
+        let result = read_glyph_id_vec(GlyphId::new(0), "fonts/Zeyada_1.ttf");
 
         match result {
             Glyph::Empty { .. } => assert!(true),
@@ -638,7 +653,7 @@ mod tests {
 
     #[test]
     fn glyph_98() {
-        let result = read_glyph_id(GlyphId::new(98), "fonts/Zeyada_1.ttf");
+        let result = read_glyph_id_file(GlyphId::new(98), "fonts/Zeyada_1.ttf");
 
         match result {
             Glyph::Empty { .. } => assert!(true),
@@ -648,10 +663,84 @@ mod tests {
     }
 
     #[test]
-    fn notdef_4() {
-        let result = read_glyph_id(GlyphId::new(4), "fonts/Zeyada_1.ttf");
+    fn notdef_zeyada_glyph_4() {
+        let glyph = read_glyph_id_file(GlyphId::new(4), "fonts/Zeyada_1.ttf");
 
-        match result {
+        check_glyph_id_4_golos(glyph)
+    }
+
+    #[test]
+    fn notdef_zeyada_glyph_4_vec() {
+        let glyph = read_glyph_id_vec(GlyphId::new(4), "fonts/Zeyada_1.ttf");
+
+        check_glyph_id_4_golos(glyph)
+    }
+
+    #[test]
+    fn notdef_golos_glyph_0() {
+        let glyph = read_glyph_id_file(GlyphId::new(0), "fonts/GolosText-Regular.ttf");
+
+        check_glyph_id_0_golos(glyph)
+    }
+
+    #[test]
+    fn notdef_golos_glyph_0_vec() {
+        let glyph = read_glyph_id_vec(GlyphId::new(0), "fonts/GolosText-Regular.ttf");
+        check_glyph_id_0_golos(glyph)
+    }
+
+    #[test]
+    fn test_char_exclamation_mark_zeyada() {
+        let glyph = read_char_code_file(b'!' as u16, "fonts/Zeyada_1.ttf");
+        check_exclamation_mark_zeyada(glyph)
+    }
+
+    #[test]
+    fn test_char_exclamation_mark_zeyada_vec() {
+        let glyph = read_char_code_vec(b'!' as u16, "fonts/Zeyada_1.ttf");
+        check_exclamation_mark_zeyada(glyph)
+    }
+
+    #[test]
+    fn test_char_exclamation_mark_golos_text() {
+        let glyph = read_char_code_file(b'!' as u16, "fonts/GolosText-Regular.ttf");
+        check_exclamation_mark_golos(glyph)
+    }
+
+    #[test]
+    fn test_char_exclamation_mark_golos_text_vec() {
+        let glyph = read_char_code_vec(b'!' as u16, "fonts/GolosText-Regular.ttf");
+        check_exclamation_mark_golos(glyph)
+    }
+
+    #[test]
+    fn test_char_a_golos_text() {
+        let glyph = read_char_code_file(b'a' as u16, "fonts/GolosText-Regular.ttf");
+
+        check_a_zeyada(glyph);
+    }
+
+    #[test]
+    fn test_char_a_golos_text_vec() {
+        let glyph = read_char_code_vec(b'a' as u16, "fonts/GolosText-Regular.ttf");
+
+        check_a_zeyada(glyph)
+    }
+
+    #[test]
+    fn test_char_aacute_golos_text() {
+        let glyph = read_char_code_file('á' as u16, "fonts/GolosText-Regular.ttf");
+        check_aacute_golos(glyph)
+    }
+
+    #[test]
+    fn test_char_aacute_golos_text_vec() {
+        let glyph = read_char_code_vec('á' as u16, "fonts/GolosText-Regular.ttf");
+        check_aacute_golos(glyph)
+    }
+
+    fn check_glyph_id_4_golos(glyph: Glyph) {
+        match glyph {
             Glyph::Empty { .. } => panic!("Expected Simple glyph"),
             Glyph::Compount { .. } => panic!("Expected Simple glyph"),
             Glyph::Simple {
@@ -730,11 +819,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn notdef_golos_text() {
-        let result = read_glyph_id(GlyphId::new(0), "fonts/GolosText-Regular.ttf");
-
-        match result {
+    fn check_glyph_id_0_golos(glyph: Glyph) {
+        match glyph {
             Glyph::Empty { .. } => panic!("Expected Simple glyph"),
             Glyph::Compount { .. } => panic!("Expected Simple glyph"),
             Glyph::Simple {
@@ -775,11 +861,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_char_exclamation_mark_zeyada() {
-        let result = read_glyph(b'!' as u16, "fonts/Zeyada_1.ttf");
-
-        match result {
+    fn check_exclamation_mark_zeyada(glyph: Glyph) {
+        match glyph {
             Glyph::Empty { .. } => panic!("Expected Simple glyph"),
             Glyph::Compount { .. } => panic!("Expected Simple glyph"),
             Glyph::Simple {
@@ -859,11 +942,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_char_exclamation_mark_golos_text() {
-        let result = read_glyph(b'!' as u16, "fonts/GolosText-Regular.ttf");
-
-        match result {
+    fn check_exclamation_mark_golos(glyph: Glyph) {
+        match glyph {
             Glyph::Empty { .. } => panic!("Expected Simple glyph"),
             Glyph::Compount { .. } => panic!("Expected Simple glyph"),
             Glyph::Simple {
@@ -914,11 +994,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_char_a_golos_text() {
-        let result = read_glyph(b'a' as u16, "fonts/GolosText-Regular.ttf");
-
-        match result {
+    fn check_a_zeyada(glyph: Glyph) {
+        match glyph {
             Glyph::Empty { .. } => panic!("Expected Empty glyph"),
             Glyph::Compount { .. } => panic!("Expected Simpe glyph"),
             Glyph::Simple {
@@ -997,11 +1074,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_char_aacute_golos_text() {
-        let result = read_glyph('á' as u16, "fonts/GolosText-Regular.ttf");
-
-        match result {
+    fn check_aacute_golos(glyph: Glyph) {
+        match glyph {
             Glyph::Empty { .. } => panic!("Expected Compount glyph"),
             Glyph::Compount {
                 glyph_id,

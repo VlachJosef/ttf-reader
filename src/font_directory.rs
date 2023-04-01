@@ -1,4 +1,4 @@
-use crate::file_ops::FileOps;
+use crate::reader::Reader;
 
 #[allow(unused)]
 pub struct FontDirectory {
@@ -7,12 +7,12 @@ pub struct FontDirectory {
 }
 
 impl FontDirectory {
-    pub fn from_file(file_ops: &mut FileOps) -> FontDirectory {
-        let offset_subtable: OffsetSubtable = OffsetSubtable::from_file(file_ops);
+    pub fn from_file(reader: &mut Box<dyn Reader>) -> FontDirectory {
+        let offset_subtable: OffsetSubtable = OffsetSubtable::from_file(reader);
 
         let table_dictionary: Vec<TableDirectory> = (0..offset_subtable.num_tables)
             .into_iter()
-            .map(|_| TableDirectory::from_file(file_ops))
+            .map(|_| TableDirectory::from_file(reader))
             .collect();
 
         FontDirectory {
@@ -39,12 +39,12 @@ struct OffsetSubtable {
 }
 
 impl OffsetSubtable {
-    fn from_file(file_ops: &mut FileOps) -> OffsetSubtable {
-        let scaler_type = file_ops.read_u32();
-        let num_tables = file_ops.read_u16();
-        let search_range = file_ops.read_u16();
-        let entry_selector = file_ops.read_u16();
-        let range_shift = file_ops.read_u16();
+    fn from_file(reader: &mut Box<dyn Reader>) -> OffsetSubtable {
+        let scaler_type = reader.read_u32();
+        let num_tables = reader.read_u16();
+        let search_range = reader.read_u16();
+        let entry_selector = reader.read_u16();
+        let range_shift = reader.read_u16();
 
         OffsetSubtable {
             scaler_type,
@@ -66,11 +66,11 @@ pub struct TableDirectory {
 }
 
 impl TableDirectory {
-    fn from_file(file_ops: &mut FileOps) -> TableDirectory {
-        let tag: String = file_ops.read_table_name();
-        let checksum = file_ops.read_u32();
-        let offset = file_ops.read_u32();
-        let length = file_ops.read_u32();
+    fn from_file(reader: &mut Box<dyn Reader>) -> TableDirectory {
+        let tag: String = reader.read_table_name();
+        let checksum = reader.read_u32();
+        let offset = reader.read_u32();
+        let length = reader.read_u32();
 
         TableDirectory {
             tag,

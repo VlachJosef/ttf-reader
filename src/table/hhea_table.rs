@@ -1,5 +1,5 @@
-use crate::file_ops::FileOps;
 use crate::model::{FWord, Fixed, UFWord};
+use crate::reader::Reader;
 
 #[allow(unused)]
 #[derive(Debug)]
@@ -20,27 +20,27 @@ pub struct HheaTable {
 }
 
 impl HheaTable {
-    pub fn from_file(file_ops: &mut FileOps, offset: u32) -> HheaTable {
-        file_ops.seek_from_start(offset);
-        let version: Fixed = file_ops.read_fixed();
-        let ascent: FWord = file_ops.read_fword();
-        let descent: FWord = file_ops.read_fword();
-        let line_gap: FWord = file_ops.read_fword();
-        let advance_width_mac: UFWord = file_ops.read_ufword();
-        let min_left_side_bearing: FWord = file_ops.read_fword();
-        let min_right_side_bearing: FWord = file_ops.read_fword();
-        let x_max_extent: FWord = file_ops.read_fword();
-        let caret_slope_rise: i16 = file_ops.read_i16();
-        let caret_slope_run: i16 = file_ops.read_i16();
-        let caret_offset: FWord = file_ops.read_fword();
+    pub fn from_file(reader: &mut Box<dyn Reader>, offset: u32) -> HheaTable {
+        reader.seek_from_start(offset);
+        let version: Fixed = reader.read_fixed();
+        let ascent: FWord = reader.read_fword();
+        let descent: FWord = reader.read_fword();
+        let line_gap: FWord = reader.read_fword();
+        let advance_width_mac: UFWord = reader.read_ufword();
+        let min_left_side_bearing: FWord = reader.read_fword();
+        let min_right_side_bearing: FWord = reader.read_fword();
+        let x_max_extent: FWord = reader.read_fword();
+        let caret_slope_rise: i16 = reader.read_i16();
+        let caret_slope_run: i16 = reader.read_i16();
+        let caret_offset: FWord = reader.read_fword();
 
-        let _reserved = file_ops.read_i16();
-        let _reserved = file_ops.read_i16();
-        let _reserved = file_ops.read_i16();
-        let _reserved = file_ops.read_i16();
+        let _reserved = reader.read_i16();
+        let _reserved = reader.read_i16();
+        let _reserved = reader.read_i16();
+        let _reserved = reader.read_i16();
 
-        let metric_data_format: i16 = file_ops.read_i16();
-        let num_of_long_hor_metrics: u16 = file_ops.read_u16();
+        let metric_data_format: i16 = reader.read_i16();
+        let num_of_long_hor_metrics: u16 = reader.read_u16();
         HheaTable {
             version,
             ascent,

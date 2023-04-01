@@ -1,5 +1,5 @@
-use crate::file_ops::FileOps;
 use crate::model::GlyphId;
+use crate::reader::Reader;
 use crate::table::head_table::HeadTable;
 use crate::table::maxp_table::MaximumProfileTable;
 use std::collections::HashMap;
@@ -27,22 +27,23 @@ impl GlyphOffset {
     }
 }
 
+#[derive(Debug)]
 pub struct GlyphIdOffsetLookup(pub HashMap<GlyphId, GlyphOffset>);
 
 impl GlyphIdOffsetLookup {
     pub fn mk_glyph_id_to_offset(
-        file_ops: &mut FileOps,
+        reader: &mut Box<dyn Reader>,
         loca_table_offset: u32,
         head_table: &HeadTable,
         maximum_profile_table: &MaximumProfileTable,
     ) -> GlyphIdOffsetLookup {
         let num_glyphs = maximum_profile_table.num_glyphs;
-        file_ops.seek_from_start(loca_table_offset);
+        reader.seek_from_start(loca_table_offset);
         let mut result: HashMap<GlyphId, GlyphOffset> = HashMap::new();
         match head_table.index_to_loc_format {
             0 => {
                 (0..num_glyphs + 1)
-                    .map(|_| file_ops.read_u16())
+                    .map(|_| reader.read_u16())
                     .collect::<Vec<u16>>()
                     .windows(2)
                     .enumerate()
@@ -58,7 +59,7 @@ impl GlyphIdOffsetLookup {
             }
             1 => {
                 (0..num_glyphs + 1)
-                    .map(|_| file_ops.read_u32())
+                    .map(|_| reader.read_u32())
                     .collect::<Vec<u32>>()
                     .windows(2)
                     .enumerate()

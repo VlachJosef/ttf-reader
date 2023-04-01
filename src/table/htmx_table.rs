@@ -1,5 +1,5 @@
-use crate::file_ops::FileOps;
 use crate::model::GlyphId;
+use crate::reader::Reader;
 use crate::table::hhea_table::HheaTable;
 use crate::table::maxp_table::MaximumProfileTable;
 use std::collections::HashMap;
@@ -11,24 +11,25 @@ pub struct LongHorMetric {
     pub left_side_bearing: i16,
 }
 
+#[derive(Debug)]
 pub struct LongHorMetricLookup(pub HashMap<GlyphId, LongHorMetric>);
 
 impl LongHorMetricLookup {
     pub fn from_file(
-        file_ops: &mut FileOps,
+        reader: &mut Box<dyn Reader>,
         offset: u32,
         hhea_table: HheaTable,
         maxp_table: &MaximumProfileTable,
     ) -> LongHorMetricLookup {
-        file_ops.seek_from_start(offset);
+        reader.seek_from_start(offset);
         let mut result: HashMap<GlyphId, LongHorMetric> = HashMap::new();
         let mut last_advance_width = 0;
 
         (0..hhea_table.num_of_long_hor_metrics)
             .into_iter()
             .for_each(|index| {
-                let advance_width: u16 = file_ops.read_u16();
-                let left_side_bearing: i16 = file_ops.read_i16();
+                let advance_width: u16 = reader.read_u16();
+                let left_side_bearing: i16 = reader.read_i16();
                 let long_hor_matrics = LongHorMetric {
                     advance_width,
                     left_side_bearing,
@@ -43,7 +44,7 @@ impl LongHorMetricLookup {
         (0..maxp_table.num_glyphs - hhea_table.num_of_long_hor_metrics)
             .into_iter()
             .for_each(|index| {
-                let left_side_bearing: i16 = file_ops.read_i16();
+                let left_side_bearing: i16 = reader.read_i16();
                 let long_hor_matrics = LongHorMetric {
                     advance_width: last_advance_width,
                     left_side_bearing,

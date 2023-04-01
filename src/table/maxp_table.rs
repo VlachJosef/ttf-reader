@@ -1,5 +1,5 @@
-use crate::file_ops::FileOps;
 use crate::model::Fixed;
+use crate::reader::Reader;
 
 #[allow(unused)]
 #[derive(Debug)]
@@ -22,23 +22,23 @@ pub struct MaximumProfileTable {
 }
 
 impl MaximumProfileTable {
-    pub fn from_file(file_ops: &mut FileOps, offset: u32) -> MaximumProfileTable {
-        file_ops.seek_from_start(offset);
-        let version: Fixed = file_ops.read_fixed();
-        let num_glyphs: u16 = file_ops.read_u16();
-        let max_points: u16 = file_ops.read_u16();
-        let max_contours: u16 = file_ops.read_u16();
-        let max_component_points: u16 = file_ops.read_u16();
-        let max_component_contours: u16 = file_ops.read_u16();
-        let max_zones: u16 = file_ops.read_u16();
-        let max_twilight_points: u16 = file_ops.read_u16();
-        let max_storage: u16 = file_ops.read_u16();
-        let max_function_defs: u16 = file_ops.read_u16();
-        let max_instruction_defs: u16 = file_ops.read_u16();
-        let max_stack_elements: u16 = file_ops.read_u16();
-        let max_size_of_instructions: u16 = file_ops.read_u16();
-        let max_component_elements: u16 = file_ops.read_u16();
-        let max_component_depth: u16 = file_ops.read_u16();
+    pub fn from_file(reader: &mut Box<dyn Reader>, offset: u32) -> MaximumProfileTable {
+        reader.seek_from_start(offset);
+        let version: Fixed = reader.read_fixed();
+        let num_glyphs: u16 = reader.read_u16();
+        let max_points: u16 = reader.read_u16();
+        let max_contours: u16 = reader.read_u16();
+        let max_component_points: u16 = reader.read_u16();
+        let max_component_contours: u16 = reader.read_u16();
+        let max_zones: u16 = reader.read_u16();
+        let max_twilight_points: u16 = reader.read_u16();
+        let max_storage: u16 = reader.read_u16();
+        let max_function_defs: u16 = reader.read_u16();
+        let max_instruction_defs: u16 = reader.read_u16();
+        let max_stack_elements: u16 = reader.read_u16();
+        let max_size_of_instructions: u16 = reader.read_u16();
+        let max_component_elements: u16 = reader.read_u16();
+        let max_component_depth: u16 = reader.read_u16();
         MaximumProfileTable {
             version,
             num_glyphs,

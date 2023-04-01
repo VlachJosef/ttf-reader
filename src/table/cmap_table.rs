@@ -1,7 +1,7 @@
-use crate::file_ops::FileOps;
 use crate::font_directory::TableDirectory;
 use crate::glyph_index_lookup::GlyphIndexLookup;
 use crate::model::{GlyphId, PlatformId};
+use crate::reader::Reader;
 
 #[allow(unused)]
 #[derive(Debug)]
@@ -12,15 +12,18 @@ pub struct CMapSubtable {
 }
 
 impl CMapSubtable {
-    pub fn find_cmap_subtable(file_ops: &mut FileOps, cmap_table: &TableDirectory) -> CMapSubtable {
-        file_ops.seek_from_start(cmap_table.offset);
-        let _version = file_ops.read_u16();
-        let number_subtables = file_ops.read_u16();
+    pub fn find_cmap_subtable(
+        reader: &mut Box<dyn Reader>,
+        cmap_table: &TableDirectory,
+    ) -> CMapSubtable {
+        reader.seek_from_start(cmap_table.offset);
+        let _version = reader.read_u16();
+        let number_subtables = reader.read_u16();
 
         let subtables = (0..number_subtables).into_iter().map(|_| {
-            let platform_id = file_ops.read_platform_id();
-            let platform_specific_id = file_ops.read_u16();
-            let offset = file_ops.read_u32();
+            let platform_id = reader.read_platform_id();
+            let platform_specific_id = reader.read_u16();
+            let offset = reader.read_u32();
 
             let offset = cmap_table.offset + offset;
 
@@ -37,61 +40,61 @@ impl CMapSubtable {
             .unwrap()
     }
 
-    pub fn segments(&self, file_ops: &mut FileOps) -> Vec<Segment> {
-        file_ops.seek_from_start(self.offset);
-        let subtable_format = file_ops.read_u16();
+    pub fn segments(&self, reader: &mut Box<dyn Reader>) -> Vec<Segment> {
+        reader.seek_from_start(self.offset);
+        let subtable_format = reader.read_u16();
         if subtable_format != 4 {
             panic!("Unsuported cmap subtable format: {}", subtable_format);
         }
-        let _length = file_ops.read_u16();
-        let _version = file_ops.read_u16();
+        let _length = reader.read_u16();
+        let _version = reader.read_u16();
 
-        let seg_count_x2 = file_ops.read_u16(); // The segCount is the number of contiguous code ranges in the font
-        let _search_range = file_ops.read_u16();
-        let _entry_selector = file_ops.read_u16();
-        let _range_shift = file_ops.read_u16();
+        let seg_count_x2 = reader.read_u16(); // The segCount is the number of contiguous code ranges in the font
+        let _search_range = reader.read_u16();
+        let _entry_selector = reader.read_u16();
+        let _range_shift = reader.read_u16();
 
-        self.read_whole_subtable(file_ops, seg_count_x2)
+        self.read_whole_subtable(reader, seg_count_x2)
     }
 
-    pub fn find_glyph_id(&self, file_ops: &mut FileOps, char_code: u16) -> GlyphId {
-        file_ops.seek_from_start(self.offset);
-        let subtable_format = file_ops.read_u16();
+    pub fn find_glyph_id(&self, reader: &mut Box<dyn Reader>, char_code: u16) -> GlyphId {
+        reader.seek_from_start(self.offset);
+        let subtable_format = reader.read_u16();
         if subtable_format != 4 {
             panic!("Unsuported cmap subtable format: {}", subtable_format);
         }
-        let _length = file_ops.read_u16();
-        let _version = file_ops.read_u16();
+        let _length = reader.read_u16();
+        let _version = reader.read_u16();
 
-        let seg_count_x2 = file_ops.read_u16(); // The segCount is the number of contiguous code ranges in the font
-        let search_range = file_ops.read_u16(); // TODO compute this from seg_count_x2
-        let entry_selector = file_ops.read_u16(); // TODO compute this from seg_count_x2
-        let _range_shift = file_ops.read_u16(); // Do not use
+        let seg_count_x2 = reader.read_u16(); // The segCount is the number of contiguous code ranges in the font
+        let search_range = reader.read_u16(); // TODO compute this from seg_count_x2
+        let entry_selector = reader.read_u16(); // TODO compute this from seg_count_x2
+        let _range_shift = reader.read_u16(); // Do not use
 
-        let mut index_lookup = GlyphIndexLookup::new(file_ops, seg_count_x2, char_code);
+        let mut index_lookup = GlyphIndexLookup::new(reader, seg_count_x2, char_code);
 
         index_lookup.seek_glyph_id(search_range, entry_selector)
     }
 
-    fn read_array(&self, file_ops: &mut FileOps, seg_count: u16) -> Vec<u16> {
+    fn read_array(&self, reader: &mut Box<dyn Reader>, seg_count: u16) -> Vec<u16> {
         (0..seg_count)
             .into_iter()
-            .map(|_| file_ops.read_u16())
+            .map(|_| reader.read_u16())
             .collect()
     }
 
-    fn read_whole_subtable(&self, file_ops: &mut FileOps, seg_count_x2: u16) -> Vec<Segment> {
+    fn read_whole_subtable(&self, reader: &mut Box<dyn Reader>, seg_count_x2: u16) -> Vec<Segment> {
         let seg_count = seg_count_x2 / 2;
 
-        let end_codes: Vec<u16> = self.read_array(file_ops, seg_count);
+        let end_codes: Vec<u16> = self.read_array(reader, seg_count);
 
-        let reserved_pad = file_ops.read_u16();
+        let reserved_pad = reader.read_u16();
 
         assert_eq!(reserved_pad, 0);
 
-        let start_codes: Vec<u16> = self.read_array(file_ops, seg_count);
-        let id_deltas: Vec<u16> = self.read_array(file_ops, seg_count);
-        let id_range_offsets: Vec<u16> = self.read_array(file_ops, seg_count);
+        let start_codes: Vec<u16> = self.read_array(reader, seg_count);
+        let id_deltas: Vec<u16> = self.read_array(reader, seg_count);
+        let id_range_offsets: Vec<u16> = self.read_array(reader, seg_count);
 
         let segments: Vec<Segment> = start_codes
             .into_iter()

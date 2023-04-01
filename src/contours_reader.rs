@@ -1,13 +1,13 @@
-use crate::file_ops::FileOps;
 use crate::model::{Contour, Contours, Point, PointType};
+use crate::reader::Reader;
 
 pub struct ContoursReader<'a> {
-    file_ops: &'a mut FileOps,
+    reader: &'a mut Box<dyn Reader>,
 }
 
 impl<'a> ContoursReader<'a> {
-    pub fn new(file_ops: &mut FileOps) -> ContoursReader {
-        ContoursReader { file_ops }
+    pub fn new(reader: &mut Box<dyn Reader>) -> ContoursReader {
+        ContoursReader { reader }
     }
 
     fn read_coordinates(
@@ -21,7 +21,7 @@ impl<'a> ContoursReader<'a> {
 
         flags.contour_flags.iter().for_each(|contour_flag| {
             let coordinate = if is_short_vector(contour_flag) {
-                let coor = self.file_ops.read_u8() as i16;
+                let coor = self.reader.read_u8() as i16;
                 if is_same(contour_flag) {
                     coor
                 } else {
@@ -30,7 +30,7 @@ impl<'a> ContoursReader<'a> {
             } else if is_same(contour_flag) {
                 0
             } else {
-                self.file_ops.read_i16()
+                self.reader.read_i16()
             };
             let coordinate = last_elem + coordinate;
             coordinates.push(coordinate);
@@ -41,27 +41,23 @@ impl<'a> ContoursReader<'a> {
     }
 
     pub fn read_contours(&mut self, n: i16) -> Contours {
-        let mut end_pts_of_contours: Vec<u16> = (0..n)
-            .into_iter()
-            .map(|_| self.file_ops.read_u16())
-            .collect();
-        let instruction_length: u16 = self.file_ops.read_u16();
+        let mut end_pts_of_contours: Vec<u16> =
+            (0..n).into_iter().map(|_| self.reader.read_u16()).collect();
 
-        self.file_ops.seek_from_current(instruction_length as i32); // Skip instructions
+        let instruction_length: u16 = self.reader.read_u16();
+
+        self.reader.seek_from_current(instruction_length as i32); // Skip instructions
 
         end_pts_of_contours.insert(0, 0);
 
         // The number of points is determined by the last entry in the end_pts_of_contours array.
         let flags: ContourFlags =
-            ContourFlags::mk_contour_flags(self.file_ops, end_pts_of_contours.clone());
+            ContourFlags::mk_contour_flags(self.reader, end_pts_of_contours.clone());
 
         let x_coordinates =
             self.read_coordinates(&flags, |cf| cf.x_short_vector(), |cf| cf.x_is_same());
         let y_coordinates =
             self.read_coordinates(&flags, |cf| cf.y_short_vector(), |cf| cf.y_is_same());
-
-        // println!("x_coordinates {:?}", x_coordinates);
-        // println!("y_coordinates {:?}", y_coordinates);
 
         let mut points: Vec<Point> = x_coordinates
             .into_iter()
@@ -89,7 +85,6 @@ impl<'a> ContoursReader<'a> {
             .iter()
             .map(|ppc| {
                 let size = *ppc as usize;
-                //let taken = points.split_off(size);
                 let taken = points.splice(0..size, []).collect();
                 Contour { points: taken }
             })
@@ -102,8 +97,8 @@ impl<'a> ContoursReader<'a> {
 struct ControlPointsFlags(u8);
 
 impl ControlPointsFlags {
-    fn from_file(file_ops: &mut FileOps) -> ControlPointsFlags {
-        ControlPointsFlags(file_ops.read_u8())
+    fn from_file(reader: &mut Box<dyn Reader>) -> ControlPointsFlags {
+        ControlPointsFlags(reader.read_u8())
     }
 
     fn is_set(&self, bit: u8) -> bool {
@@ -152,27 +147,31 @@ struct ContourFlags {
 }
 
 impl ContourFlags {
-    fn mk_contour_flags(file_ops: &mut FileOps, end_pts_of_contours: Vec<u16>) -> ContourFlags {
+    fn mk_contour_flags(
+        reader: &mut Box<dyn Reader>,
+        end_pts_of_contours: Vec<u16>,
+    ) -> ContourFlags {
         let last = end_pts_of_contours.last().unwrap();
 
         let contour_flags_total: Vec<ControlPointsFlags> =
-            Self::_mk_contour_flags(file_ops, *last + 1);
+            Self::_mk_contour_flags(reader, *last + 1);
 
         ContourFlags {
             contour_flags: contour_flags_total,
         }
     }
     fn _mk_contour_flags(
-        file_ops: &mut FileOps,
+        reader: &mut Box<dyn Reader>,
         mut number_of_points: u16,
     ) -> Vec<ControlPointsFlags> {
         let mut contour_flags: Vec<ControlPointsFlags> =
             Vec::with_capacity((number_of_points + 1) as usize);
         while number_of_points > 0 {
-            let control_points = ControlPointsFlags::from_file(file_ops);
+            let control_points = ControlPointsFlags::from_file(reader);
+
             if control_points.repeat() {
                 // If repeat is set, the next byte specifies the number of additional times this set of flags is to be repeated.
-                let mut repeat_times = file_ops.read_u8();
+                let mut repeat_times = reader.read_u8();
 
                 while repeat_times > 0 {
                     contour_flags.push(control_points);
