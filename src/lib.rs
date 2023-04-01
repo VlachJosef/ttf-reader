@@ -635,7 +635,7 @@ mod tests {
 
         match result {
             Glyph::Empty { .. } => assert!(true),
-            Glyph::Compount { .. } => panic!("Expected Empty glyph"),
+            Glyph::Compound { .. } => panic!("Expected Empty glyph"),
             Glyph::Simple { .. } => panic!("Expected Empty glyph"),
         }
     }
@@ -646,7 +646,7 @@ mod tests {
 
         match result {
             Glyph::Empty { .. } => assert!(true),
-            Glyph::Compount { .. } => panic!("Expected Empty glyph"),
+            Glyph::Compound { .. } => panic!("Expected Empty glyph"),
             Glyph::Simple { .. } => panic!("Expected Empty glyph"),
         }
     }
@@ -657,7 +657,7 @@ mod tests {
 
         match result {
             Glyph::Empty { .. } => assert!(true),
-            Glyph::Compount { .. } => panic!("Expected Empty glyph"),
+            Glyph::Compound { .. } => panic!("Expected Empty glyph"),
             Glyph::Simple { .. } => panic!("Expected Empty glyph"),
         }
     }
@@ -742,7 +742,7 @@ mod tests {
     fn check_glyph_id_4_golos(glyph: Glyph) {
         match glyph {
             Glyph::Empty { .. } => panic!("Expected Simple glyph"),
-            Glyph::Compount { .. } => panic!("Expected Simple glyph"),
+            Glyph::Compound { .. } => panic!("Expected Simple glyph"),
             Glyph::Simple {
                 glyph_id,
                 x_min,
@@ -822,7 +822,7 @@ mod tests {
     fn check_glyph_id_0_golos(glyph: Glyph) {
         match glyph {
             Glyph::Empty { .. } => panic!("Expected Simple glyph"),
-            Glyph::Compount { .. } => panic!("Expected Simple glyph"),
+            Glyph::Compound { .. } => panic!("Expected Simple glyph"),
             Glyph::Simple {
                 glyph_id,
                 x_min,
@@ -864,7 +864,7 @@ mod tests {
     fn check_exclamation_mark_zeyada(glyph: Glyph) {
         match glyph {
             Glyph::Empty { .. } => panic!("Expected Simple glyph"),
-            Glyph::Compount { .. } => panic!("Expected Simple glyph"),
+            Glyph::Compound { .. } => panic!("Expected Simple glyph"),
             Glyph::Simple {
                 glyph_id,
                 x_min,
@@ -945,7 +945,7 @@ mod tests {
     fn check_exclamation_mark_golos(glyph: Glyph) {
         match glyph {
             Glyph::Empty { .. } => panic!("Expected Simple glyph"),
-            Glyph::Compount { .. } => panic!("Expected Simple glyph"),
+            Glyph::Compound { .. } => panic!("Expected Simple glyph"),
             Glyph::Simple {
                 glyph_id,
                 x_min,
@@ -996,8 +996,8 @@ mod tests {
 
     fn check_a_zeyada(glyph: Glyph) {
         match glyph {
-            Glyph::Empty { .. } => panic!("Expected Empty glyph"),
-            Glyph::Compount { .. } => panic!("Expected Simpe glyph"),
+            Glyph::Empty { .. } => panic!("Expected Simple glyph"),
+            Glyph::Compound { .. } => panic!("Expected Simple glyph"),
             Glyph::Simple {
                 glyph_id,
                 x_min,
@@ -1076,8 +1076,8 @@ mod tests {
 
     fn check_aacute_golos(glyph: Glyph) {
         match glyph {
-            Glyph::Empty { .. } => panic!("Expected Compount glyph"),
-            Glyph::Compount {
+            Glyph::Empty { .. } => panic!("Expected Compound glyph"),
+            Glyph::Compound {
                 glyph_id,
                 x_min,
                 x_max,
@@ -1113,7 +1113,7 @@ mod tests {
                 assert_eq!(c2.argument_types, ArgumentTypes::XYValue16(230, 0));
             }
 
-            Glyph::Simple { .. } => panic!("Expected Compount glyph"),
+            Glyph::Simple { .. } => panic!("Expected Compound glyph"),
         }
     }
 }

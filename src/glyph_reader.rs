@@ -166,7 +166,7 @@ impl GlyphReader {
 
                 let components: Vec<ComponentData> = gc.collect();
 
-                Glyph::Compount {
+                Glyph::Compound {
                     glyph_id,
                     x_min,
                     x_max,

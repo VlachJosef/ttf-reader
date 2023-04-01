@@ -51,7 +51,7 @@ pub enum Glyph {
         left_side_bearing: i16,
         contours: Vec<Contour>,
     },
-    Compount {
+    Compound {
         glyph_id: GlyphId,
         x_min: FWord,
         y_min: FWord,
