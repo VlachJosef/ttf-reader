@@ -63,6 +63,16 @@ pub enum Glyph {
     },
 }
 
+impl Glyph {
+    pub fn advance_width(&self) -> u16 {
+        match self {
+            Glyph::Empty { advance_width, .. } => *advance_width,
+            Glyph::Simple { advance_width, .. } => *advance_width,
+            Glyph::Compound { advance_width, .. } => *advance_width,
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum PointType {
     OnCurve,
