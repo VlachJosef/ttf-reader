@@ -13,6 +13,9 @@ fn main() {
 
     let mut glyph_reader = GlyphReader::from_file(file);
 
+    let bounding_box = glyph_reader.bounding_box();
+    println!("Min/Max bounding box: {:?}", bounding_box);
+
     glyph_reader.display_font_info();
 
     let segments = glyph_reader.cmap_table_segments();

@@ -20,6 +20,7 @@ pub struct GlyphReader {
     cmap_subtable: CMapSubtable,
     long_hor_metric_lookup: LongHorMetricLookup,
     font_directory: FontDirectory,
+    head_table: HeadTable,
 }
 
 impl GlyphReader {
@@ -80,7 +81,17 @@ impl GlyphReader {
             cmap_subtable,
             long_hor_metric_lookup,
             font_directory,
+            head_table,
         }
+    }
+
+    pub fn bounding_box(&self) -> (i16, i16, i16, i16) {
+        (
+            self.head_table.x_min.0,
+            self.head_table.y_min.0,
+            self.head_table.x_max.0,
+            self.head_table.y_max.0,
+        )
     }
 
     pub fn display_font_info(&mut self) {
